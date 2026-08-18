@@ -63,6 +63,7 @@ import { initOutboxStore, PostgresOutboxStore } from "./outbox/store.js"
 import { OutboxSender } from "./outbox/sender.js"
 import { OutboxWorker } from "./outbox/worker.js"
 import { DealStatusSyncWorker } from "./workers/dealStatusSyncWorker.js"
+import { RentToOwnSyncWorker } from "./workers/rentToOwnSyncWorker.js"
 import { initializeAppSecretRotation, secretRotationMiddleware, createSecretRotationRouter } from "./middleware/secretRotation.js"
 import { getSecretRotationService } from "./services/secretRotationService.js"
 import migrationGuideRouter from "./routes/migrationGuide.js"
@@ -401,6 +402,14 @@ export function createApp() {
     );
     dealStatusSyncWorker.start(dealSyncIntervalMs);
     workers.push(dealStatusSyncWorker);
+
+    const rentToOwnSyncWorker = new RentToOwnSyncWorker(sorobanAdapter);
+    const rentToOwnSyncIntervalMs = parseInt(
+      process.env.RENT_TO_OWN_SYNC_WORKER_INTERVAL_MS ?? "30000",
+      10,
+    );
+    rentToOwnSyncWorker.start(rentToOwnSyncIntervalMs);
+    workers.push(rentToOwnSyncWorker);
   }
 
   // Job Scheduler — swap to Postgres store when DATABASE_URL is set

@@ -10,6 +10,7 @@ export type SorobanConfig = {
   usdcTokenId?: string
   dealEscrowId?: string
   inspectorBondId?: string
+  rentToOwnId?: string
   adminSecret?: string
   seed?: string | number
 }
@@ -26,6 +27,7 @@ export function getSorobanConfigFromEnv(env: NodeJS.ProcessEnv): SorobanConfig {
     usdcTokenId: addresses.usdcToken,
     dealEscrowId: addresses.dealEscrow,
     inspectorBondId: addresses.inspectorBond,
+    rentToOwnId: addresses.rentToOwn,
     adminSecret: env.SOROBAN_ADMIN_SECRET,
     seed: env.SOROBAN_STUB_SEED,
   }

@@ -1,4 +1,12 @@
-import { SorobanAdapter, RecordReceiptParams, SyncDealStatusParams, TenantReputationRecord } from './adapter.js'
+import {
+  SorobanAdapter,
+  RecordReceiptParams,
+  SyncDealStatusParams,
+  TenantReputationRecord,
+  RegisterRentToOwnDealParams,
+  RecordRentToOwnEquityPaymentParams,
+  RentToOwnDealActionParams,
+} from './adapter.js'
 import { SorobanConfig } from './client.js'
 import { RawReceiptEvent } from '../indexer/event-parser.js'
 import { logger } from '../utils/logger.js'
@@ -219,6 +227,22 @@ export class StubSorobanAdapter implements SorobanAdapter {
 
      async syncDealStatus(params: SyncDealStatusParams): Promise<void> {
           logger.info('Soroban stub: syncDealStatus', { ...params })
+     }
+
+     async registerRentToOwnDeal(params: RegisterRentToOwnDealParams): Promise<void> {
+          logger.info('Soroban stub: registerRentToOwnDeal', { ...params })
+     }
+
+     async recordRentToOwnEquityPayment(params: RecordRentToOwnEquityPaymentParams): Promise<void> {
+          logger.info('Soroban stub: recordRentToOwnEquityPayment', { ...params })
+     }
+
+     async completeRentToOwnDeal(params: RentToOwnDealActionParams): Promise<void> {
+          logger.info('Soroban stub: completeRentToOwnDeal', { ...params })
+     }
+
+     async defaultRentToOwnDeal(params: RentToOwnDealActionParams): Promise<void> {
+          logger.info('Soroban stub: defaultRentToOwnDeal', { ...params })
      }
 
      async updateTenantReputation(tenantId: string, record: TenantReputationRecord): Promise<void> {

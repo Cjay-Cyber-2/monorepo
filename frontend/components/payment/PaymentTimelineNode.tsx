@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   Clock,
   Loader2,
+  Link2,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,12 @@ export interface PaymentTimelineNodeProps {
   isOverdue?: boolean;
   daysOverdue?: number;
   onDownloadReceipt?: () => void;
+  /**
+   * True once this payment's rent-to-own equity is confirmed on-chain
+   * (record_equity_payment landed). False/undefined shows nothing extra —
+   * this is an additive indicator, not a replacement for `status`.
+   */
+  confirmedOnChain?: boolean;
 }
 
 // Each status pairs a label with a distinct icon so it is never conveyed by
@@ -42,6 +49,7 @@ export function PaymentTimelineNode({
   isOverdue = false,
   daysOverdue,
   onDownloadReceipt,
+  confirmedOnChain,
 }: PaymentTimelineNodeProps) {
   const { className: statusClassName, icon: StatusIcon, spin } = statusConfig[status];
   return (
@@ -55,16 +63,27 @@ export function PaymentTimelineNode({
             <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">{date}</p>
             <p className="mt-1 text-xl font-bold">{formatNgn(amount)}</p>
           </div>
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${statusClassName}`}
-          >
-            <StatusIcon
-              className={`h-3.5 w-3.5 ${spin ? "motion-safe:animate-spin" : ""}`}
-              aria-hidden="true"
-            />
-            <span className="sr-only">Status: </span>
-            {status}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${statusClassName}`}
+            >
+              <StatusIcon
+                className={`h-3.5 w-3.5 ${spin ? "motion-safe:animate-spin" : ""}`}
+                aria-hidden="true"
+              />
+              <span className="sr-only">Status: </span>
+              {status}
+            </span>
+            {confirmedOnChain ? (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-900"
+                title="Equity for this payment is recorded on-chain"
+              >
+                <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
+                Confirmed on-chain
+              </span>
+            ) : null}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-muted-foreground">

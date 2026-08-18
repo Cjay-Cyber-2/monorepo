@@ -171,6 +171,9 @@ export function PropertySidebar({
                   Soon
                 </span>
               </Link>
+              <p className="text-center text-[11px] text-muted-foreground">
+                Equity shown here is an estimate. Once a deal is live, accumulated equity is confirmed on-chain.
+              </p>
             </div>
           ) : (
             <Link href="/login">

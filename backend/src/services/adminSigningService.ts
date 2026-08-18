@@ -20,6 +20,8 @@ export type AdminOperation =
   | 'default_deal'
   | 'stake_bond'
   | 'unstake_bond'
+  | 'register_deal'
+  | 'record_equity_payment'
 
 /**
  * Parameters for admin operations
@@ -149,6 +151,8 @@ export class AdminSigningService {
       'default_deal',
       'stake_bond',
       'unstake_bond',
+      'register_deal',
+      'record_equity_payment',
     ]
     if (!allowedOperations.includes(params.operation)) {
       throw new ConfigurationError(

@@ -43,6 +43,7 @@ export function PaymentTimeline({
                 isOverdue={payment.isOverdue}
                 daysOverdue={payment.daysOverdue}
                 onDownloadReceipt={() => onDownloadReceipt(payment.reference)}
+                confirmedOnChain={payment.confirmedOnChain}
               />
             </li>
           ))}
