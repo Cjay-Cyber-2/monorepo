@@ -1625,6 +1625,236 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /api/tenant/payments/disputes:
+    post:
+      summary: File a payment dispute
+      description: |
+        Files a payment dispute against a deal. Asynchronously (via the
+        outbox/worker pattern — never synchronously in this request) enqueues
+        an on-chain `challenge_rent_release` call against deal_escrow for the
+        given `dealId`, halting any pending rent release within its challenge
+        window. If deal_escrow has no pending release for this deal (or the
+        challenge window already closed), the on-chain call is rejected and
+        the dispute is marked `rejected` with that reason — it is never left
+        silently "pending" with no on-chain effect.
+      operationId: createPaymentDispute
+      tags:
+        - Disputes
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentDisputeCreateRequest'
+      responses:
+        '201':
+          description: Dispute filed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    required:
+                      - dispute
+                    properties:
+                      dispute:
+                        $ref: '#/components/schemas/PaymentDispute'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+    get:
+      summary: List the authenticated tenant's own disputes
+      description: Returns every dispute filed by the authenticated caller, most recent first.
+      operationId: listMyPaymentDisputes
+      tags:
+        - Disputes
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The caller's disputes
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    required:
+                      - disputes
+                    properties:
+                      disputes:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PaymentDispute'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/admin/disputes:
+    get:
+      summary: List payment disputes (admin)
+      description: Returns a paginated, filterable list of payment disputes for admin review.
+      operationId: listPaymentDisputesAdmin
+      tags:
+        - Disputes
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/PaymentDisputeStatus'
+        - name: userId
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        '200':
+          description: Paginated dispute list
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - disputes
+                  - total
+                  - page
+                  - pageSize
+                  - totalPages
+                properties:
+                  disputes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PaymentDispute'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  pageSize:
+                    type: integer
+                  totalPages:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Caller lacks the disputes:view permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/admin/disputes/{disputeId}/resolve:
+    post:
+      summary: Resolve a payment dispute (admin)
+      description: |
+        Resolves or rejects a payment dispute and, asynchronously via the
+        outbox/worker pattern, enqueues a matching on-chain
+        `resolve_rent_dispute` call against deal_escrow (skipped if the
+        dispute has no associated dealId).
+
+        Status → SettlementOutcome mapping:
+        - `resolved` (the tenant's dispute is upheld) → `RefundToDepositor`
+          (the pending rent release is refunded to the tenant, not released
+          to the landlord).
+        - `rejected` (the dispute is denied) → `ReleaseToRecipient` (the
+          originally requested release proceeds to its recipient, e.g. the
+          landlord).
+      operationId: resolvePaymentDisputeAdmin
+      tags:
+        - Disputes
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: disputeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [resolved, rejected]
+                resolution:
+                  type: string
+      responses:
+        '200':
+          description: Dispute resolved
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Caller lacks the disputes:resolve permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /api/admin/rewards/{rewardId}/mark-paid:
     post:
       summary: Mark reward as paid
@@ -3571,6 +3801,102 @@ components:
           type: string
           description: Reference part of the canonical external reference (e.g. payment intent ID)
           example: pi_3OZxyz123456
+
+    PaymentDisputeReason:
+      type: string
+      enum:
+        - amount_discrepancy
+        - duplicate_charge
+        - service_not_received
+        - early_termination
+        - property_issue
+        - other
+
+    PaymentDisputeStatus:
+      type: string
+      enum:
+        - pending
+        - under_review
+        - resolved
+        - rejected
+
+    PaymentDisputeCreateRequest:
+      type: object
+      required:
+        - paymentId
+        - dealId
+        - reason
+        - description
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+        dealId:
+          type: string
+          description: The deal_escrow deal ID this dispute is challenging a pending rent release for.
+          example: 550e8400-e29b-41d4-a716-446655440000
+        reason:
+          $ref: '#/components/schemas/PaymentDisputeReason'
+        description:
+          type: string
+          minLength: 10
+          maxLength: 1000
+        evidenceKeys:
+          type: array
+          maxItems: 5
+          items:
+            type: string
+
+    PaymentDispute:
+      type: object
+      required:
+        - id
+        - userId
+        - paymentId
+        - dealId
+        - reason
+        - description
+        - evidenceKeys
+        - status
+        - resolution
+        - resolvedBy
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+        paymentId:
+          type: string
+          format: uuid
+        dealId:
+          type: string
+          nullable: true
+          description: Null for disputes filed before deal_id was captured.
+        reason:
+          $ref: '#/components/schemas/PaymentDisputeReason'
+        description:
+          type: string
+        evidenceKeys:
+          type: array
+          items:
+            type: string
+        status:
+          $ref: '#/components/schemas/PaymentDisputeStatus'
+        resolution:
+          type: string
+          nullable: true
+        resolvedBy:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
 
     Error:
       type: object

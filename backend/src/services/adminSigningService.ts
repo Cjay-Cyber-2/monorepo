@@ -20,6 +20,11 @@ export type AdminOperation =
   | 'default_deal'
   | 'stake_bond'
   | 'unstake_bond'
+  | 'request_rent_release'
+  | 'challenge_rent_release'
+  | 'resolve_rent_dispute'
+  | 'settle_rent_release_timeout'
+  | 'settle_dispute_timeout'
 
 /**
  * Parameters for admin operations
@@ -149,6 +154,11 @@ export class AdminSigningService {
       'default_deal',
       'stake_bond',
       'unstake_bond',
+      'request_rent_release',
+      'challenge_rent_release',
+      'resolve_rent_dispute',
+      'settle_rent_release_timeout',
+      'settle_dispute_timeout',
     ]
     if (!allowedOperations.includes(params.operation)) {
       throw new ConfigurationError(

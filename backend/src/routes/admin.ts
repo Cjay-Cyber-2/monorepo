@@ -1244,12 +1244,21 @@ export function createAdminRouter(
               }
 
               const newStatus = action === "resolve" ? "resolved" : "rejected";
-              await paymentDisputeRepository.updateStatus(
+              const updated = await paymentDisputeRepository.updateStatus(
                 id,
                 newStatus,
                 resolution,
                 adminId
               );
+
+              if (updated) {
+                const { enqueueResolveRentDispute } = await import(
+                  "../services/disputes/rentReleaseSync.js"
+                );
+                enqueueResolveRentDispute(updated, newStatus, resolution ?? "").catch((err) =>
+                  logger.error("Failed to enqueue resolve_rent_dispute for dispute:", err)
+                );
+              }
 
               auditLog(
                 "DISPUTE_RESOLVED" as AuditEventType,

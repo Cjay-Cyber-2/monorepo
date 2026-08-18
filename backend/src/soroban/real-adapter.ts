@@ -11,7 +11,17 @@ import {
   StrKey,
   BASE_FEE,
 } from '@stellar/stellar-sdk'
-import { SorobanAdapter, RecordReceiptParams, SyncDealStatusParams } from './adapter.js'
+import {
+  SorobanAdapter,
+  RecordReceiptParams,
+  SyncDealStatusParams,
+  RequestRentReleaseParams,
+  ChallengeRentReleaseParams,
+  ResolveRentDisputeParams,
+  SettleRentReleaseTimeoutParams,
+  SettleDisputeTimeoutParams,
+  RentDisputeOutcome,
+} from './adapter.js'
 import { SorobanConfig } from './client.js'
 import { RawReceiptEvent } from '../indexer/event-parser.js'
 import { logger } from '../utils/logger.js'
@@ -1147,6 +1157,162 @@ export class RealSorobanAdapter implements SorobanAdapter {
       newStatus: params.newStatus,
       actor: params.actor,
     })
+  }
+
+  /**
+   * Admin/operator operation: deal_escrow `request_rent_release`.
+   * Nothing in the backend currently triggers this call — see PR description
+   * for the out-of-scope note on wiring up the actual trigger.
+   */
+  async requestRentRelease(params: RequestRentReleaseParams): Promise<void> {
+    const contractId = this.config.dealEscrowId
+    if (!contractId) {
+      throw new ConfigurationError('SOROBAN_DEAL_ESCROW_ID not configured for request_rent_release')
+    }
+    if (!this.config.adminSecret) {
+      throw new ConfigurationError('SOROBAN_ADMIN_SECRET not configured for request_rent_release')
+    }
+    const adminAddress = Keypair.fromSecret(this.config.adminSecret).publicKey()
+    const args: xdr.ScVal[] = [
+      nativeToScVal(new Address(adminAddress)),
+      nativeToScVal(params.dealId, { type: 'string' }),
+      nativeToScVal(new Address(params.to)),
+      this.decimalToI128(params.amountUsdc),
+      xdr.ScVal.scvSymbol(params.externalRefSource),
+      nativeToScVal(params.externalRef, { type: 'string' }),
+    ]
+    await this.adminSigningService.executeAdminOperation({
+      contractId,
+      operation: 'request_rent_release',
+      args,
+      networkPassphrase: this.config.networkPassphrase,
+      adminSecret: this.config.adminSecret,
+      server: this.server,
+    })
+    logger.info('Rent release requested on-chain', { dealId: params.dealId, to: params.to })
+  }
+
+  /**
+   * Admin operation: deal_escrow `challenge_rent_release`.
+   *
+   * KNOWN LIMITATION (see PR description): the contract requires `caller` to
+   * equal the deal's on-chain depositor or the pending release's recipient
+   * (`caller.require_auth()` against that specific identity) — not the
+   * platform admin. This passes the admin's own address as `caller`, which
+   * only satisfies that check if the admin's address happens to equal the
+   * depositor/recipient. Until request_rent_release/deposit are wired up with
+   * real per-user identities (and per-user custodial signing via
+   * CustodialWalletServiceImpl is threaded through here), this call fails
+   * closed with NotAuthorized rather than silently misrepresenting who
+   * challenged the release — it does not bypass tenant/landlord consent.
+   */
+  async challengeRentRelease(params: ChallengeRentReleaseParams): Promise<void> {
+    const contractId = this.config.dealEscrowId
+    if (!contractId) {
+      throw new ConfigurationError('SOROBAN_DEAL_ESCROW_ID not configured for challenge_rent_release')
+    }
+    if (!this.config.adminSecret) {
+      throw new ConfigurationError('SOROBAN_ADMIN_SECRET not configured for challenge_rent_release')
+    }
+    const adminAddress = Keypair.fromSecret(this.config.adminSecret).publicKey()
+    const args: xdr.ScVal[] = [
+      nativeToScVal(new Address(adminAddress)),
+      nativeToScVal(params.dealId, { type: 'string' }),
+      nativeToScVal(params.challengeEvidenceRef, { type: 'string' }),
+    ]
+    await this.adminSigningService.executeAdminOperation({
+      contractId,
+      operation: 'challenge_rent_release',
+      args,
+      networkPassphrase: this.config.networkPassphrase,
+      adminSecret: this.config.adminSecret,
+      server: this.server,
+    })
+    logger.info('Rent release challenged on-chain', { dealId: params.dealId })
+  }
+
+  /**
+   * Admin operation: deal_escrow `resolve_rent_dispute`.
+   *
+   * KNOWN LIMITATION (see PR description): the contract requires `caller` to
+   * equal the contract's configured resolver (`get_resolver`), which may be a
+   * different signer from the general admin key used elsewhere. This assumes
+   * `set_resolver` has granted the admin's own address the resolver role at
+   * deploy time; if a distinct resolver key is provisioned, this call fails
+   * with NotAuthorized until that key is wired in here instead.
+   */
+  async resolveRentDispute(params: ResolveRentDisputeParams): Promise<void> {
+    const contractId = this.config.dealEscrowId
+    if (!contractId) {
+      throw new ConfigurationError('SOROBAN_DEAL_ESCROW_ID not configured for resolve_rent_dispute')
+    }
+    if (!this.config.adminSecret) {
+      throw new ConfigurationError('SOROBAN_ADMIN_SECRET not configured for resolve_rent_dispute')
+    }
+    const adminAddress = Keypair.fromSecret(this.config.adminSecret).publicKey()
+    const args: xdr.ScVal[] = [
+      nativeToScVal(new Address(adminAddress)),
+      nativeToScVal(params.dealId, { type: 'string' }),
+      this.settlementOutcomeToScVal(params.outcome),
+      nativeToScVal(params.resolutionEvidenceRef, { type: 'string' }),
+    ]
+    await this.adminSigningService.executeAdminOperation({
+      contractId,
+      operation: 'resolve_rent_dispute',
+      args,
+      networkPassphrase: this.config.networkPassphrase,
+      adminSecret: this.config.adminSecret,
+      server: this.server,
+    })
+    logger.info('Rent dispute resolved on-chain', { dealId: params.dealId, outcome: params.outcome })
+  }
+
+  /** Permissionless operation: deal_escrow `settle_rent_release_timeout(deal_id)` — no caller/admin arg in the contract signature. */
+  async settleRentReleaseTimeout(params: SettleRentReleaseTimeoutParams): Promise<void> {
+    const contractId = this.config.dealEscrowId
+    if (!contractId) {
+      throw new ConfigurationError('SOROBAN_DEAL_ESCROW_ID not configured for settle_rent_release_timeout')
+    }
+    if (!this.config.adminSecret) {
+      throw new ConfigurationError('SOROBAN_ADMIN_SECRET not configured for settle_rent_release_timeout')
+    }
+    const args: xdr.ScVal[] = [nativeToScVal(params.dealId, { type: 'string' })]
+    await this.adminSigningService.executeAdminOperation({
+      contractId,
+      operation: 'settle_rent_release_timeout',
+      args,
+      networkPassphrase: this.config.networkPassphrase,
+      adminSecret: this.config.adminSecret,
+      server: this.server,
+    })
+    logger.info('Rent release timeout settled on-chain', { dealId: params.dealId })
+  }
+
+  /** Permissionless operation: deal_escrow `settle_dispute_timeout(deal_id)` — no caller/admin arg in the contract signature. */
+  async settleDisputeTimeout(params: SettleDisputeTimeoutParams): Promise<void> {
+    const contractId = this.config.dealEscrowId
+    if (!contractId) {
+      throw new ConfigurationError('SOROBAN_DEAL_ESCROW_ID not configured for settle_dispute_timeout')
+    }
+    if (!this.config.adminSecret) {
+      throw new ConfigurationError('SOROBAN_ADMIN_SECRET not configured for settle_dispute_timeout')
+    }
+    const args: xdr.ScVal[] = [nativeToScVal(params.dealId, { type: 'string' })]
+    await this.adminSigningService.executeAdminOperation({
+      contractId,
+      operation: 'settle_dispute_timeout',
+      args,
+      networkPassphrase: this.config.networkPassphrase,
+      adminSecret: this.config.adminSecret,
+      server: this.server,
+    })
+    logger.info('Dispute timeout settled on-chain', { dealId: params.dealId })
+  }
+
+  /** Encodes deal_escrow's `SettlementOutcome` #[repr(u32)] enum discriminant (ReleaseToRecipient=1, RefundToDepositor=2). */
+  private settlementOutcomeToScVal(outcome: RentDisputeOutcome): xdr.ScVal {
+    const discriminant = outcome === 'release_to_recipient' ? 1 : 2
+    return nativeToScVal(discriminant, { type: 'u32' })
   }
 
   async getTimelockEvents(fromLedger: number | null): Promise<any[]> {

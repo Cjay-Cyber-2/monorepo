@@ -1,4 +1,14 @@
-import { SorobanAdapter, RecordReceiptParams, SyncDealStatusParams, TenantReputationRecord } from './adapter.js'
+import {
+     SorobanAdapter,
+     RecordReceiptParams,
+     SyncDealStatusParams,
+     TenantReputationRecord,
+     RequestRentReleaseParams,
+     ChallengeRentReleaseParams,
+     ResolveRentDisputeParams,
+     SettleRentReleaseTimeoutParams,
+     SettleDisputeTimeoutParams,
+} from './adapter.js'
 import { SorobanConfig } from './client.js'
 import { RawReceiptEvent } from '../indexer/event-parser.js'
 import { logger } from '../utils/logger.js'
@@ -219,6 +229,26 @@ export class StubSorobanAdapter implements SorobanAdapter {
 
      async syncDealStatus(params: SyncDealStatusParams): Promise<void> {
           logger.info('Soroban stub: syncDealStatus', { ...params })
+     }
+
+     async requestRentRelease(params: RequestRentReleaseParams): Promise<void> {
+          logger.info('Soroban stub: requestRentRelease', { ...params })
+     }
+
+     async challengeRentRelease(params: ChallengeRentReleaseParams): Promise<void> {
+          logger.info('Soroban stub: challengeRentRelease', { ...params })
+     }
+
+     async resolveRentDispute(params: ResolveRentDisputeParams): Promise<void> {
+          logger.info('Soroban stub: resolveRentDispute', { ...params })
+     }
+
+     async settleRentReleaseTimeout(params: SettleRentReleaseTimeoutParams): Promise<void> {
+          logger.info('Soroban stub: settleRentReleaseTimeout', { ...params })
+     }
+
+     async settleDisputeTimeout(params: SettleDisputeTimeoutParams): Promise<void> {
+          logger.info('Soroban stub: settleDisputeTimeout', { ...params })
      }
 
      async updateTenantReputation(tenantId: string, record: TenantReputationRecord): Promise<void> {

@@ -173,6 +173,7 @@ export type DisputeReason =
 export interface PaymentDispute {
   id: string;
   paymentId: string;
+  dealId: string;
   reason: DisputeReason;
   description: string;
   status: "pending" | "under_review" | "resolved" | "rejected";
@@ -183,21 +184,30 @@ export interface PaymentDispute {
 
 export interface CreateDisputeRequest {
   paymentId: string;
+  dealId: string;
   reason: DisputeReason;
   description: string;
   evidenceKeys?: string[];
 }
 
-export async function getMyDisputes(): Promise<{ disputes: PaymentDispute[] }> {
-  return apiGet<{ disputes: PaymentDispute[] }>(
-    "/api/tenant/payments/disputes",
-  );
+export interface GetMyDisputesResponse {
+  success: boolean;
+  data: { disputes: PaymentDispute[] };
+}
+
+export interface CreateDisputeResponse {
+  success: boolean;
+  data: { dispute: PaymentDispute };
+}
+
+export async function getMyDisputes(): Promise<GetMyDisputesResponse> {
+  return apiGet<GetMyDisputesResponse>("/api/tenant/payments/disputes");
 }
 
 export async function createDispute(
   data: CreateDisputeRequest,
-): Promise<{ success: boolean; disputeId: string }> {
-  return apiPost<{ success: boolean; disputeId: string }>(
+): Promise<CreateDisputeResponse> {
+  return apiPost<CreateDisputeResponse>(
     "/api/tenant/payments/disputes",
     data,
   );

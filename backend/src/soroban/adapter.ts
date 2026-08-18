@@ -27,6 +27,42 @@ export interface SyncDealStatusParams {
 }
 
 /**
+ * deal_escrow's rent-release dispute mechanism (request_rent_release /
+ * challenge_rent_release / resolve_rent_dispute / settle_*_timeout).
+ * `dealId` here is deal_escrow's own String-typed deal ID (unlike
+ * rent_to_own, deal_escrow does not use BytesN<32>).
+ */
+export interface RequestRentReleaseParams {
+  dealId: string
+  to: string // Stellar Address of the release recipient (e.g. landlord)
+  amountUsdc: string // decimal string, USDC (6 decimals)
+  externalRefSource: string
+  externalRef: string
+}
+
+export interface ChallengeRentReleaseParams {
+  dealId: string
+  challengeEvidenceRef: string
+}
+
+/** Mirrors the contract's `SettlementOutcome` enum discriminants (1/2). */
+export type RentDisputeOutcome = 'release_to_recipient' | 'refund_to_depositor'
+
+export interface ResolveRentDisputeParams {
+  dealId: string
+  outcome: RentDisputeOutcome
+  resolutionEvidenceRef: string
+}
+
+export interface SettleRentReleaseTimeoutParams {
+  dealId: string
+}
+
+export interface SettleDisputeTimeoutParams {
+  dealId: string
+}
+
+/**
  * Callback fired after a Stellar transaction is signed and hashed but *before*
  * it is broadcast to the network. Persisting the hash at this point allows a
  * worker that crashes between broadcast and result-recording to recover by
@@ -96,4 +132,11 @@ export interface SorobanAdapter {
   setOperator?(contractId: string, operatorAddress: string | null): Promise<string>
   init?(contractId: string, adminAddress: string, operatorAddress?: string): Promise<string>
   syncDealStatus?(params: SyncDealStatusParams): Promise<void>
+
+  // deal_escrow rent-release dispute mechanism
+  requestRentRelease?(params: RequestRentReleaseParams): Promise<void>
+  challengeRentRelease?(params: ChallengeRentReleaseParams): Promise<void>
+  resolveRentDispute?(params: ResolveRentDisputeParams): Promise<void>
+  settleRentReleaseTimeout?(params: SettleRentReleaseTimeoutParams): Promise<void>
+  settleDisputeTimeout?(params: SettleDisputeTimeoutParams): Promise<void>
 }

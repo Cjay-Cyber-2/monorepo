@@ -131,6 +131,7 @@ describe('Payment Dispute API', () => {
     it('should return 500 when database is not available', async () => {
       const disputeData = {
         paymentId: '550e8400-e29b-41d4-a716-446655440000',
+        dealId: 'deal-1',
         reason: 'amount_discrepancy',
         description: 'The amount charged is incorrect',
       }

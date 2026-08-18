@@ -25,6 +25,8 @@ export enum TxType {
   CONVERSION = 'conversion',
   DEAL_STATUS_CHANGED = 'deal_status_changed',
   TENANT_REPUTATION_UPDATE = 'tenant_reputation_update',
+  RENT_RELEASE_DISPUTE_CHALLENGE = 'rent_release_dispute_challenge',
+  RENT_RELEASE_DISPUTE_RESOLVE = 'rent_release_dispute_resolve',
 }
 
 /**
