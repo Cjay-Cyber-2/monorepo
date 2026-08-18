@@ -94,6 +94,13 @@ export interface PaymentHistoryItem {
   method: string;
   isOverdue?: boolean;
   daysOverdue?: number;
+  /**
+   * True once this payment's rent-to-own equity has actually landed
+   * on-chain (record_equity_payment confirmed), as opposed to merely
+   * being marked paid off-chain. Undefined when the backend hasn't
+   * surfaced on-chain confirmation for this payment yet.
+   */
+  confirmedOnChain?: boolean;
 }
 
 export interface PaymentHistoryResponse {

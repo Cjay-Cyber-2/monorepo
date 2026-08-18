@@ -11,7 +11,14 @@ import {
   StrKey,
   BASE_FEE,
 } from '@stellar/stellar-sdk'
-import { SorobanAdapter, RecordReceiptParams, SyncDealStatusParams } from './adapter.js'
+import {
+  SorobanAdapter,
+  RecordReceiptParams,
+  SyncDealStatusParams,
+  RegisterRentToOwnDealParams,
+  RecordRentToOwnEquityPaymentParams,
+  RentToOwnDealActionParams,
+} from './adapter.js'
 import { SorobanConfig } from './client.js'
 import { RawReceiptEvent } from '../indexer/event-parser.js'
 import { logger } from '../utils/logger.js'
@@ -27,6 +34,7 @@ import {
   isTransientRpcError,
 } from './errors.js'
 import { AdminSigningService } from '../services/adminSigningService.js'
+import { toSorobanReasonSymbol } from '../services/deals/rentToOwnConversion.js'
 import { getStellarSequenceAllocator, type AllocationResult } from '../services/stellarSequenceAllocator.js'
 import { env } from '../schemas/env.js'
 import { trace, SpanStatusCode, Span } from '@opentelemetry/api'
@@ -1146,6 +1154,125 @@ export class RealSorobanAdapter implements SorobanAdapter {
       contractDealId: params.contractDealId,
       newStatus: params.newStatus,
       actor: params.actor,
+    })
+  }
+
+  /**
+   * Admin operation: rent_to_own `register_deal`.
+   * `contractDealId` is a hex-encoded BytesN<32> — see RegisterRentToOwnDealParams.
+   */
+  async registerRentToOwnDeal(params: RegisterRentToOwnDealParams): Promise<void> {
+    const contractId = this.config.rentToOwnId
+    if (!contractId) {
+      throw new ConfigurationError('SOROBAN_RENT_TO_OWN_ID not configured for rent_to_own registration')
+    }
+    if (!this.config.adminSecret) {
+      throw new ConfigurationError('SOROBAN_ADMIN_SECRET not configured for rent_to_own registration')
+    }
+
+    const adminAddress = Keypair.fromSecret(this.config.adminSecret).publicKey()
+    const args: xdr.ScVal[] = [
+      nativeToScVal(new Address(adminAddress)),
+      this.bytesToScVal(Buffer.from(params.contractDealId, 'hex')),
+      nativeToScVal(new Address(params.tenantAddress)),
+      this.decimalToI128(params.propertyValueUsdc),
+      this.decimalToI128(params.monthlyEquityUsdc),
+      nativeToScVal(params.totalPaymentsRequired, { type: 'u32' }),
+    ]
+
+    await this.adminSigningService.executeAdminOperation({
+      contractId,
+      operation: 'register_deal',
+      args,
+      networkPassphrase: this.config.networkPassphrase,
+      adminSecret: this.config.adminSecret,
+      server: this.server,
+    })
+
+    logger.info('rent_to_own deal registered on-chain', {
+      dealId: params.dealId,
+      contractDealId: params.contractDealId,
+      totalPaymentsRequired: params.totalPaymentsRequired,
+    })
+  }
+
+  /** Admin operation: rent_to_own `record_equity_payment`. */
+  async recordRentToOwnEquityPayment(params: RecordRentToOwnEquityPaymentParams): Promise<void> {
+    const contractId = this.config.rentToOwnId
+    if (!contractId) {
+      throw new ConfigurationError('SOROBAN_RENT_TO_OWN_ID not configured for rent_to_own equity payment')
+    }
+    if (!this.config.adminSecret) {
+      throw new ConfigurationError('SOROBAN_ADMIN_SECRET not configured for rent_to_own equity payment')
+    }
+
+    const adminAddress = Keypair.fromSecret(this.config.adminSecret).publicKey()
+    const args: xdr.ScVal[] = [
+      nativeToScVal(new Address(adminAddress)),
+      this.bytesToScVal(Buffer.from(params.contractDealId, 'hex')),
+      this.decimalToI128(params.rentAmountUsdc),
+      this.decimalToI128(params.equityAmountUsdc),
+    ]
+
+    await this.adminSigningService.executeAdminOperation({
+      contractId,
+      operation: 'record_equity_payment',
+      args,
+      networkPassphrase: this.config.networkPassphrase,
+      adminSecret: this.config.adminSecret,
+      server: this.server,
+    })
+
+    logger.info('rent_to_own equity payment recorded on-chain', {
+      dealId: params.dealId,
+      contractDealId: params.contractDealId,
+      period: params.period,
+    })
+  }
+
+  /** Admin operation: rent_to_own `complete_deal`. */
+  async completeRentToOwnDeal(params: RentToOwnDealActionParams): Promise<void> {
+    await this.callRentToOwnDealAction('complete_deal', params)
+  }
+
+  /** Admin operation: rent_to_own `default_deal`. */
+  async defaultRentToOwnDeal(params: RentToOwnDealActionParams): Promise<void> {
+    await this.callRentToOwnDealAction('default_deal', params)
+  }
+
+  private async callRentToOwnDealAction(
+    operation: 'complete_deal' | 'default_deal',
+    params: RentToOwnDealActionParams,
+  ): Promise<void> {
+    const contractId = this.config.rentToOwnId
+    if (!contractId) {
+      throw new ConfigurationError(`SOROBAN_RENT_TO_OWN_ID not configured for rent_to_own ${operation}`)
+    }
+    if (!this.config.adminSecret) {
+      throw new ConfigurationError(`SOROBAN_ADMIN_SECRET not configured for rent_to_own ${operation}`)
+    }
+
+    const adminAddress = Keypair.fromSecret(this.config.adminSecret).publicKey()
+    const args: xdr.ScVal[] = [
+      nativeToScVal(new Address(adminAddress)),
+      this.bytesToScVal(Buffer.from(params.contractDealId, 'hex')),
+    ]
+    if (operation === 'default_deal') {
+      args.push(xdr.ScVal.scvSymbol(toSorobanReasonSymbol(params.reason)))
+    }
+
+    await this.adminSigningService.executeAdminOperation({
+      contractId,
+      operation,
+      args,
+      networkPassphrase: this.config.networkPassphrase,
+      adminSecret: this.config.adminSecret,
+      server: this.server,
+    })
+
+    logger.info(`rent_to_own ${operation} synced on-chain`, {
+      dealId: params.dealId,
+      contractDealId: params.contractDealId,
     })
   }
 

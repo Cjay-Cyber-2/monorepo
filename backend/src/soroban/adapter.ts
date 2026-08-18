@@ -27,6 +27,36 @@ export interface SyncDealStatusParams {
 }
 
 /**
+ * Params for rent_to_own's `register_deal`. `contractDealId` is a hex-encoded
+ * BytesN<32> — distinct from deal_escrow's String-typed deal ID (see
+ * `SyncDealStatusParams.contractDealId`); rent_to_own and deal_escrow do not
+ * share a deal-ID encoding.
+ */
+export interface RegisterRentToOwnDealParams {
+  dealId: string
+  contractDealId: string // hex-encoded BytesN<32>
+  tenantAddress: string // Stellar Address of the tenant
+  propertyValueUsdc: string // decimal string, USDC (6 decimals)
+  monthlyEquityUsdc: string // decimal string, USDC (6 decimals)
+  totalPaymentsRequired: number
+}
+
+export interface RecordRentToOwnEquityPaymentParams {
+  dealId: string
+  contractDealId: string // hex-encoded BytesN<32>
+  period: number
+  rentAmountUsdc: string // decimal string, USDC (6 decimals)
+  equityAmountUsdc: string // decimal string, USDC (6 decimals)
+}
+
+export interface RentToOwnDealActionParams {
+  dealId: string
+  contractDealId: string // hex-encoded BytesN<32>
+  /** Only used by defaultRentToOwnDeal; a short symbol-safe reason code. */
+  reason?: string
+}
+
+/**
  * Callback fired after a Stellar transaction is signed and hashed but *before*
  * it is broadcast to the network. Persisting the hash at this point allows a
  * worker that crashes between broadcast and result-recording to recover by
@@ -96,4 +126,10 @@ export interface SorobanAdapter {
   setOperator?(contractId: string, operatorAddress: string | null): Promise<string>
   init?(contractId: string, adminAddress: string, operatorAddress?: string): Promise<string>
   syncDealStatus?(params: SyncDealStatusParams): Promise<void>
+
+  // rent_to_own contract — equity-tracking deal lifecycle
+  registerRentToOwnDeal?(params: RegisterRentToOwnDealParams): Promise<void>
+  recordRentToOwnEquityPayment?(params: RecordRentToOwnEquityPaymentParams): Promise<void>
+  completeRentToOwnDeal?(params: RentToOwnDealActionParams): Promise<void>
+  defaultRentToOwnDeal?(params: RentToOwnDealActionParams): Promise<void>
 }
