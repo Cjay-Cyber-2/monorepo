@@ -12,6 +12,7 @@ export const CONTRACT_ENV_VARS = {
   inspectorBond: 'SOROBAN_INSPECTOR_BOND_ID',
   tenantReputation: 'SOROBAN_TENANT_REPUTATION_ID',
   usdcToken: 'SOROBAN_USDC_TOKEN_ID',
+  rentToOwn: 'SOROBAN_RENT_TO_OWN_ID',
 } as const
 
 export type ContractName = keyof typeof CONTRACT_ENV_VARS

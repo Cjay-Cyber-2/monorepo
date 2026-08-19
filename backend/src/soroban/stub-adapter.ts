@@ -8,6 +8,9 @@ import {
      ResolveRentDisputeParams,
      SettleRentReleaseTimeoutParams,
      SettleDisputeTimeoutParams,
+     RegisterRentToOwnDealParams,
+     RecordRentToOwnEquityPaymentParams,
+     RentToOwnDealActionParams,
 } from './adapter.js'
 import { SorobanConfig } from './client.js'
 import { RawReceiptEvent } from '../indexer/event-parser.js'
@@ -231,7 +234,7 @@ export class StubSorobanAdapter implements SorobanAdapter {
           logger.info('Soroban stub: syncDealStatus', { ...params })
      }
 
-     async requestRentRelease(params: RequestRentReleaseParams): Promise<void> {
+async requestRentRelease(params: RequestRentReleaseParams): Promise<void> {
           logger.info('Soroban stub: requestRentRelease', { ...params })
      }
 
@@ -249,6 +252,22 @@ export class StubSorobanAdapter implements SorobanAdapter {
 
      async settleDisputeTimeout(params: SettleDisputeTimeoutParams): Promise<void> {
           logger.info('Soroban stub: settleDisputeTimeout', { ...params })
+     }
+
+     async registerRentToOwnDeal(params: RegisterRentToOwnDealParams): Promise<void> {
+          logger.info('Soroban stub: registerRentToOwnDeal', { ...params })
+     }
+
+     async recordRentToOwnEquityPayment(params: RecordRentToOwnEquityPaymentParams): Promise<void> {
+          logger.info('Soroban stub: recordRentToOwnEquityPayment', { ...params })
+     }
+
+     async completeRentToOwnDeal(params: RentToOwnDealActionParams): Promise<void> {
+          logger.info('Soroban stub: completeRentToOwnDeal', { ...params })
+     }
+
+     async defaultRentToOwnDeal(params: RentToOwnDealActionParams): Promise<void> {
+          logger.info('Soroban stub: defaultRentToOwnDeal', { ...params })
      }
 
      async updateTenantReputation(tenantId: string, record: TenantReputationRecord): Promise<void> {

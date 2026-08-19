@@ -25,6 +25,8 @@ export type AdminOperation =
   | 'resolve_rent_dispute'
   | 'settle_rent_release_timeout'
   | 'settle_dispute_timeout'
+  | 'register_deal'
+  | 'record_equity_payment'
 
 /**
  * Parameters for admin operations
@@ -159,6 +161,8 @@ export class AdminSigningService {
       'resolve_rent_dispute',
       'settle_rent_release_timeout',
       'settle_dispute_timeout',
+      'register_deal',
+      'record_equity_payment',
     ]
     if (!allowedOperations.includes(params.operation)) {
       throw new ConfigurationError(

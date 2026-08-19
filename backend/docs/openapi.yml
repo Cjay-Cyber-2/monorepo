@@ -1557,6 +1557,15 @@ paths:
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
+        '409':
+          description: |
+            Marking this period paid would push accumulated rent-to-own equity
+            over the property value (mirrors the rent_to_own contract's
+            `EquityOverflow` guard — code `EQUITY_OVERFLOW`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -1571,6 +1580,12 @@ paths:
 
         Only receipts with status `sent` (confirmed on-chain) are counted.
         USDC is the canonical accounting unit.
+
+        `equityAccumulatedUsdc`/`equityPercentageBps` reflect rent_to_own
+        equity that has actually landed on-chain (only `sent`
+        `RENT_TO_OWN_EQUITY_PAYMENT` outbox items are counted) — this is
+        contract-confirmed state, distinct from `periodsPaid`, which is a raw
+        receipt count.
       operationId: getDealProgress
       tags:
         - Deals
@@ -1610,6 +1625,10 @@ paths:
                   lastPaymentTxId: "a3f2c1d4e5b6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2"
                   lastPaymentExternalRefSource: stripe
                   lastPaymentExternalRef: pi_3OZxyz123456
+                  equityAccumulatedUsdc: "80.650000"
+                  equityCapUsdc: "600.000000"
+                  equityPercentageBps: 1344
+                  equityPaymentsConfirmed: 2
         '404':
           description: Deal not found
           content:
@@ -3770,6 +3789,10 @@ components:
         - periodsPaid
         - remainingPeriods
         - nextDueDate
+        - equityAccumulatedUsdc
+        - equityCapUsdc
+        - equityPercentageBps
+        - equityPaymentsConfirmed
       properties:
         totalPaidUsdc:
           type: string
@@ -3801,6 +3824,26 @@ components:
           type: string
           description: Reference part of the canonical external reference (e.g. payment intent ID)
           example: pi_3OZxyz123456
+        equityAccumulatedUsdc:
+          type: string
+          description: |
+            Rent-to-own equity confirmed on-chain — sum of `sent`
+            RENT_TO_OWN_EQUITY_PAYMENT receipts' equityAmountUsdc (decimal
+            string, 6 decimal places). Reflects record_equity_payment calls
+            that actually landed on the rent_to_own contract.
+          example: "80.650000"
+        equityCapUsdc:
+          type: string
+          description: rent_to_own's property_value_usdc equity cap for this deal (decimal string, 6 decimal places)
+          example: "600.000000"
+        equityPercentageBps:
+          type: integer
+          description: equityAccumulatedUsdc as basis points of equityCapUsdc (0-10000), mirroring the contract's get_equity_percentage
+          example: 1344
+        equityPaymentsConfirmed:
+          type: integer
+          description: Number of RENT_TO_OWN_EQUITY_PAYMENT receipts confirmed on-chain
+          example: 2
 
     PaymentDisputeReason:
       type: string

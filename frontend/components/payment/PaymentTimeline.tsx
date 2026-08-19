@@ -50,6 +50,7 @@ export function PaymentTimeline({
                 isOverdue={payment.isOverdue}
                 daysOverdue={payment.daysOverdue}
                 onDownloadReceipt={() => onDownloadReceipt(payment.reference)}
+                confirmedOnChain={payment.confirmedOnChain}
                 disputeStatus={disputeStatusByPayment[payment.id] ?? null}
                 onReportProblem={
                   onReportProblem ? () => onReportProblem(payment.id) : undefined
