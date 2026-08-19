@@ -8,13 +8,23 @@ import {
   AlertTriangle,
   Clock,
   Loader2,
+  ShieldAlert,
+  ShieldCheck,
   Link2,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatNgn } from "@/lib/currency";
+import type { DisputeStatus } from "@/lib/disputeTimeline";
 
 type PaymentStatus = "Paid" | "Overdue" | "Upcoming" | "Processing";
+
+const disputeConfig: Record<DisputeStatus, { className: string; icon: LucideIcon }> = {
+  pending: { className: "bg-amber-100 text-amber-900 border-amber-300", icon: ShieldAlert },
+  under_review: { className: "bg-amber-100 text-amber-900 border-amber-300", icon: ShieldAlert },
+  resolved: { className: "bg-emerald-100 text-emerald-900 border-emerald-300", icon: ShieldCheck },
+  rejected: { className: "bg-red-100 text-red-900 border-red-300", icon: ShieldAlert },
+};
 
 export interface PaymentTimelineNodeProps {
   date: string;
@@ -24,6 +34,9 @@ export interface PaymentTimelineNodeProps {
   isOverdue?: boolean;
   daysOverdue?: number;
   onDownloadReceipt?: () => void;
+  disputeStatus?: DisputeStatus | null;
+  onReportProblem?: () => void;
+  onViewDispute?: () => void;
   /**
    * True once this payment's rent-to-own equity is confirmed on-chain
    * (record_equity_payment landed). False/undefined shows nothing extra —
@@ -49,9 +62,13 @@ export function PaymentTimelineNode({
   isOverdue = false,
   daysOverdue,
   onDownloadReceipt,
+  disputeStatus = null,
+  onReportProblem,
+  onViewDispute,
   confirmedOnChain,
 }: PaymentTimelineNodeProps) {
   const { className: statusClassName, icon: StatusIcon, spin } = statusConfig[status];
+  const dispute = disputeStatus ? disputeConfig[disputeStatus] : null;
   return (
     <div className="group relative flex gap-4 rounded-3xl border-2 border-foreground/10 bg-card p-5 shadow-[4px_4px_0_rgba(26,26,26,0.1)] transition hover:-translate-y-0.5 hover:shadow-[6px_6px_0_rgba(26,26,26,0.1)]">
       <div className="flex h-12 w-12 flex-none items-center justify-center rounded-full border-2 border-foreground/20 bg-muted text-foreground">
@@ -105,6 +122,27 @@ export function PaymentTimelineNode({
             <Download className="mr-2 h-4 w-4" />
             Download Receipt
           </Button>
+          {disputeStatus ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onViewDispute}
+              className="border-2 border-foreground bg-background text-foreground hover:bg-muted"
+            >
+              <dispute.icon className="mr-2 h-4 w-4" />
+              View Dispute
+            </Button>
+          ) : onReportProblem ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onReportProblem}
+              className="border-2 border-foreground bg-background text-foreground hover:bg-muted"
+            >
+              <ShieldAlert className="mr-2 h-4 w-4" />
+              Report a problem
+            </Button>
+          ) : null}
           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
             <ArrowRight className="h-3 w-3" />
             View payment details

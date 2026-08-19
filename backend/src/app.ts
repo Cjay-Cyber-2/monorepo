@@ -63,6 +63,7 @@ import { initOutboxStore, PostgresOutboxStore } from "./outbox/store.js"
 import { OutboxSender } from "./outbox/sender.js"
 import { OutboxWorker } from "./outbox/worker.js"
 import { DealStatusSyncWorker } from "./workers/dealStatusSyncWorker.js"
+import { RentReleaseDisputeWorker } from "./workers/rentReleaseDisputeWorker.js"
 import { RentToOwnSyncWorker } from "./workers/rentToOwnSyncWorker.js"
 import { initializeAppSecretRotation, secretRotationMiddleware, createSecretRotationRouter } from "./middleware/secretRotation.js"
 import { getSecretRotationService } from "./services/secretRotationService.js"
@@ -111,6 +112,7 @@ import { createTenantSavedPropertiesRouter } from "./routes/tenantSavedPropertie
 import { createTenantPaymentsRouter } from "./routes/tenantPayments.js";
 import { createNotificationsRouter } from "./routes/notifications.js";
 import { createSettlementAdminRouter } from "./routes/settlementAdmin.js";
+import { createDisputeAdminRouter } from "./routes/disputeAdmin.js";
 import { SettlementOutboxWorker } from "./settlement/worker.js";
 import { createLedgerReconciliationRouter } from "./routes/ledgerReconciliation.js";
 import { createAdminTransactionLedgerRouter } from "./routes/adminTransactionLedger.js";
@@ -402,6 +404,17 @@ export function createApp() {
     );
     dealStatusSyncWorker.start(dealSyncIntervalMs);
     workers.push(dealStatusSyncWorker);
+
+    // deal_escrow's default challenge/dispute windows are 24h/48h — a 15
+    // minute poll is far more than granular enough to catch expirations
+    // promptly without hammering the RPC endpoint.
+    const rentReleaseDisputeWorker = new RentReleaseDisputeWorker(sorobanAdapter);
+    const rentReleaseDisputeIntervalMs = parseInt(
+      process.env.RENT_RELEASE_DISPUTE_WORKER_INTERVAL_MS ?? "900000",
+      10,
+    );
+    rentReleaseDisputeWorker.start(rentReleaseDisputeIntervalMs);
+    workers.push(rentReleaseDisputeWorker);
 
     const rentToOwnSyncWorker = new RentToOwnSyncWorker(sorobanAdapter);
     const rentToOwnSyncIntervalMs = parseInt(
@@ -866,6 +879,7 @@ export function createApp() {
   app.use("/api/v1/admin", createAdminTenantCreditScoreRouter());
   app.use("/api/v1/admin/credit-score", createAdminCreditScoreRouter());
   app.use("/api/v1/admin", createSettlementAdminRouter());
+  app.use("/api/v1/admin/disputes", createDisputeAdminRouter());
   app.use("/api/v1/config/feature-flags", createFeatureFlagsRouter());
 
 
@@ -909,6 +923,7 @@ export function createApp() {
   app.use("/api/notifications", createNotificationsRouter());
   app.use("/api/admin", createSettlementAdminRouter());
   app.use("/api/admin", createAdminRolesRouter());
+  app.use("/api/admin/disputes", createDisputeAdminRouter());
   app.use("/api/apartment-reviews", createApartmentReviewsRouter());
   app.use("/api/compliance/reports", createComplianceReportRouter());
   app.use("/api/kyc", createKycRouter());

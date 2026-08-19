@@ -52,6 +52,7 @@ interface FakeDispute {
   id: string
   userId: string
   paymentId: string
+  dealId: string | null
   reason: string
   description: string
   evidenceKeys: string[]
@@ -73,6 +74,7 @@ vi.mock('../repositories/PaymentDisputeRepository.js', () => ({
         id: randomUUID(),
         userId,
         paymentId: data.paymentId,
+        dealId: data.dealId ?? null,
         reason: data.reason,
         description: data.description,
         evidenceKeys: data.evidenceKeys ?? [],
@@ -136,6 +138,7 @@ describe('Payment Dispute Routes', () => {
 
   const validCreatePayload = () => ({
     paymentId: randomUUID(),
+    dealId: 'deal-1',
     reason: 'amount_discrepancy' as const,
     description: 'The charged amount does not match the agreed rent for this period.',
   })
