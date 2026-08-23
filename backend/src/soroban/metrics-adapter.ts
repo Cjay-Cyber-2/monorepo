@@ -4,7 +4,7 @@
  * Wraps any SorobanAdapter to automatically track RPC call metrics
  */
 
-import { SorobanAdapter, RecordReceiptParams, TenantReputationRecord } from './adapter.js';
+import { SorobanAdapter, RecordReceiptParams, TenantReputationRecord, OraclePriceReading } from './adapter.js';
 import { SorobanConfig } from './client.js';
 import { RawReceiptEvent } from '../indexer/event-parser.js';
 import { recordSorobanRpcCall } from '../utils/metrics.js';
@@ -133,6 +133,20 @@ export class MetricsSorobanAdapter implements SorobanAdapter {
 
   async getBond(inspectorId: string): Promise<{ isBonded: boolean; amount: bigint }> {
     return this.trackCall('getBond', () => this.wrapped.getBond(inspectorId))
+  }
+
+  async getOraclePrice?(pair: string): Promise<OraclePriceReading> {
+    if (!this.wrapped.getOraclePrice) {
+      throw new Error('getOraclePrice not implemented');
+    }
+    return this.trackCall('getOraclePrice', () => this.wrapped.getOraclePrice!(pair));
+  }
+
+  async isOraclePriceStale?(pair: string): Promise<boolean> {
+    if (!this.wrapped.isOraclePriceStale) {
+      throw new Error('isOraclePriceStale not implemented');
+    }
+    return this.trackCall('isOraclePriceStale', () => this.wrapped.isOraclePriceStale!(pair));
   }
 
   /**

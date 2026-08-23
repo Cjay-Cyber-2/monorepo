@@ -93,6 +93,17 @@ export interface RentToOwnDealActionParams {
 }
 
 /**
+ * A read from the `oracle_price_feeds` contract's `PriceFeed` struct.
+ * `price` is scaled by `10^decimals` (decimals is always 7 in the contract).
+ */
+export interface OraclePriceReading {
+  price: bigint
+  decimals: number
+  updatedAt: number
+  sequence: number
+}
+
+/**
  * Callback fired after a Stellar transaction is signed and hashed but *before*
  * it is broadcast to the network. Persisting the hash at this point allows a
  * worker that crashes between broadcast and result-recording to recover by
@@ -175,4 +186,8 @@ export interface SorobanAdapter {
   recordRentToOwnEquityPayment?(params: RecordRentToOwnEquityPaymentParams): Promise<void>
   completeRentToOwnDeal?(params: RentToOwnDealActionParams): Promise<void>
   defaultRentToOwnDeal?(params: RentToOwnDealActionParams): Promise<void>
+
+  // oracle_price_feeds contract — read-only price queries (issue #1488)
+  getOraclePrice?(pair: string): Promise<OraclePriceReading>
+  isOraclePriceStale?(pair: string): Promise<boolean>
 }

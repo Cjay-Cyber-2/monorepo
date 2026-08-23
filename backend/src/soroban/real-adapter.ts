@@ -24,6 +24,7 @@ import {
   RegisterRentToOwnDealParams,
   RecordRentToOwnEquityPaymentParams,
   RentToOwnDealActionParams,
+  OraclePriceReading,
 } from './adapter.js'
 import { SorobanConfig } from './client.js'
 import { RawReceiptEvent } from '../indexer/event-parser.js'
@@ -1613,5 +1614,99 @@ export class RealSorobanAdapter implements SorobanAdapter {
     )
     const native = scValToNative(retval)
     return { isBonded: Boolean(native.is_bonded), amount: BigInt(native.amount ?? 0) }
+  }
+
+  /**
+   * Read the current price for `pair` from the oracle_price_feeds contract.
+   * The contract's `get_price` itself reverts with `PriceTooStale` (and other
+   * guard errors) when no fresh quorum is available, so a thrown error from
+   * this call already indicates the price should not be trusted — callers
+   * that also want an explicit pre-check can call `isOraclePriceStale` first.
+   */
+  async getOraclePrice(pair: string): Promise<OraclePriceReading> {
+    return tracer.startActiveSpan('RealSorobanAdapter.getOraclePrice', async (span) => {
+      span.setAttribute('soroban.oracle.pair', pair)
+
+      if (!this.config.oraclePriceFeedsId) {
+        const err = new ConfigurationError('SOROBAN_ORACLE_PRICE_FEEDS_ID not configured')
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message })
+        span.recordException(err)
+        span.end()
+        throw err
+      }
+
+      try {
+        const retval = await this.invokeReadOnly(
+          this.config.oraclePriceFeedsId,
+          'get_price',
+          [nativeToScVal(pair, { type: 'symbol' })],
+        )
+        const native = scValToNative(retval) as {
+          price: bigint | number | string
+          decimals: bigint | number | string
+          updated_at: bigint | number | string
+          sequence: bigint | number | string
+        }
+        const reading: OraclePriceReading = {
+          price: BigInt(native.price),
+          decimals: Number(native.decimals),
+          updatedAt: Number(native.updated_at),
+          sequence: Number(native.sequence),
+        }
+        span.setAttribute('soroban.oracle.price', reading.price.toString())
+        span.setStatus({ code: SpanStatusCode.OK })
+        return reading
+      } catch (err: any) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message || String(err) })
+        if (err instanceof Error) span.recordException(err)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to get oracle price for ${pair}`,
+          this.config.oraclePriceFeedsId,
+          'get_price',
+          err,
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  async isOraclePriceStale(pair: string): Promise<boolean> {
+    return tracer.startActiveSpan('RealSorobanAdapter.isOraclePriceStale', async (span) => {
+      span.setAttribute('soroban.oracle.pair', pair)
+
+      if (!this.config.oraclePriceFeedsId) {
+        const err = new ConfigurationError('SOROBAN_ORACLE_PRICE_FEEDS_ID not configured')
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message })
+        span.recordException(err)
+        span.end()
+        throw err
+      }
+
+      try {
+        const retval = await this.invokeReadOnly(
+          this.config.oraclePriceFeedsId,
+          'is_stale',
+          [nativeToScVal(pair, { type: 'symbol' })],
+        )
+        const stale = Boolean(scValToNative(retval))
+        span.setAttribute('soroban.oracle.is_stale', stale)
+        span.setStatus({ code: SpanStatusCode.OK })
+        return stale
+      } catch (err: any) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message || String(err) })
+        if (err instanceof Error) span.recordException(err)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to check oracle staleness for ${pair}`,
+          this.config.oraclePriceFeedsId,
+          'is_stale',
+          err,
+        )
+      } finally {
+        span.end()
+      }
+    })
   }
 }

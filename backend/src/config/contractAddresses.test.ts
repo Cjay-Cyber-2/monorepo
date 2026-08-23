@@ -20,6 +20,19 @@ describe('contract address config', () => {
     expect(Object.keys(addresses)).toEqual(Object.keys(CONTRACT_ENV_VARS))
   })
 
+  it('recognizes SOROBAN_ORACLE_PRICE_FEEDS_ID (issue #1488)', () => {
+    expect(CONTRACT_ENV_VARS.oraclePriceFeeds).toBe('SOROBAN_ORACLE_PRICE_FEEDS_ID')
+
+    const addresses = loadContractAddresses({
+      SOROBAN_ORACLE_PRICE_FEEDS_ID: VALID_CONTRACT_ID,
+    })
+    expect(addresses.oraclePriceFeeds).toBe(VALID_CONTRACT_ID)
+
+    expect(() =>
+      loadContractAddresses({ SOROBAN_ORACLE_PRICE_FEEDS_ID: 'not-a-contract' }),
+    ).toThrow('Invalid Soroban contract ID in SOROBAN_ORACLE_PRICE_FEEDS_ID')
+  })
+
   it('fails fast with the offending environment variable', () => {
     expect(() =>
       loadContractAddresses({

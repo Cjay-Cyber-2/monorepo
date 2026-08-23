@@ -332,7 +332,10 @@ export function createApp() {
   const rewardsDataLayer = process.env.DATABASE_URL
     ? new PostgresRewardsDataLayer()
     : new StubRewardsDataLayer();
-  const conversionProvider = createConversionProviderFromEnv(env);
+  const conversionProvider = createConversionProviderFromEnv(env, {
+    sorobanAdapter,
+    oracleContractId: sorobanConfig.oraclePriceFeedsId,
+  });
   const conversionRateService = new ConversionRateService(conversionProvider);
   const conversionService = new ConversionService(conversionProvider, "onramp");
   app.set("conversionService", conversionService);
