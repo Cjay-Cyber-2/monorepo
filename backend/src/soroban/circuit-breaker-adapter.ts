@@ -7,7 +7,7 @@ import {
 } from './circuit-breaker-errors.js'
 import { CircuitBreaker } from './circuit-breaker.js'
 import { CircuitBreakerConfig } from './circuit-breaker-config.js'
-import { SorobanAdapter, RecordReceiptParams, TenantReputationRecord } from './adapter.js'
+import { SorobanAdapter, RecordReceiptParams, TenantReputationRecord, OraclePriceReading } from './adapter.js'
 import { SorobanConfig } from './client.js'
 import { RawReceiptEvent } from '../indexer/event-parser.js'
 
@@ -275,6 +275,24 @@ export class CircuitBreakerAdapter implements SorobanAdapter {
     }
     return this.executeWithCircuitBreaker('getTenantReputation', () =>
       this.wrappedAdapter.getTenantReputation!(tenantId),
+    )
+  }
+
+  async getOraclePrice?(pair: string): Promise<OraclePriceReading> {
+    if (!this.wrappedAdapter.getOraclePrice) {
+      throw new Error('getOraclePrice not supported by wrapped adapter')
+    }
+    return this.executeWithCircuitBreaker('getOraclePrice', () =>
+      this.wrappedAdapter.getOraclePrice!(pair),
+    )
+  }
+
+  async isOraclePriceStale?(pair: string): Promise<boolean> {
+    if (!this.wrappedAdapter.isOraclePriceStale) {
+      throw new Error('isOraclePriceStale not supported by wrapped adapter')
+    }
+    return this.executeWithCircuitBreaker('isOraclePriceStale', () =>
+      this.wrappedAdapter.isOraclePriceStale!(pair),
     )
   }
 }

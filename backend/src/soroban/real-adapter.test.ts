@@ -102,6 +102,7 @@ describe('RealSorobanAdapter', () => {
     stakingPoolId: 'CBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBD3Y4',
     stakingRewardsId: 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCD4Z5',
     usdcTokenId: 'CDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD5A6',
+    oraclePriceFeedsId: 'CEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEED6B7',
     adminSecret: 'SXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX1',
   }
 
@@ -224,6 +225,73 @@ describe('RealSorobanAdapter', () => {
 
       expect(mockServer.simulateTransaction).toHaveBeenCalled()
       expect(rewards).toBe(250000000n)
+    })
+  })
+
+  describe('getOraclePrice', () => {
+    it('should throw ConfigurationError when oraclePriceFeedsId not set', async () => {
+      const adapterWithoutOracle = new RealSorobanAdapter({
+        ...mockConfig,
+        oraclePriceFeedsId: undefined,
+      })
+
+      await expect(adapterWithoutOracle.getOraclePrice('NGN_USDC')).rejects.toThrow(ConfigurationError)
+    })
+
+    it('should read a PriceFeed struct via get_price', async () => {
+      const { rpc, scValToNative } = await import('@stellar/stellar-sdk')
+
+      vi.mocked(rpc.Api.isSimulationSuccess).mockReturnValue(true)
+      vi.mocked(scValToNative).mockReturnValueOnce({
+        pair: 'NGN_USDC',
+        price: 16_000_000_000n,
+        decimals: 7,
+        updated_at: 1_000,
+        sequence: 3,
+      })
+      mockServer.simulateTransaction.mockResolvedValue({
+        result: { retval: {} },
+      })
+
+      const reading = await adapter.getOraclePrice('NGN_USDC')
+
+      expect(mockServer.simulateTransaction).toHaveBeenCalled()
+      expect(reading).toEqual({ price: 16_000_000_000n, decimals: 7, updatedAt: 1_000, sequence: 3 })
+    })
+
+    it('should wrap simulation failures (e.g. a PriceTooStale revert) in ContractError', async () => {
+      const { rpc } = await import('@stellar/stellar-sdk')
+
+      vi.mocked(rpc.Api.isSimulationSuccess).mockReturnValue(false)
+      vi.mocked(rpc.Api.isSimulationRestore).mockReturnValue(false)
+      mockServer.simulateTransaction.mockResolvedValue({
+        error: 'HostError: Error(Contract, #4)', // ContractError::PriceTooStale
+      })
+
+      await expect(adapter.getOraclePrice('NGN_USDC')).rejects.toThrow(ContractError)
+    })
+  })
+
+  describe('isOraclePriceStale', () => {
+    it('should throw ConfigurationError when oraclePriceFeedsId not set', async () => {
+      const adapterWithoutOracle = new RealSorobanAdapter({
+        ...mockConfig,
+        oraclePriceFeedsId: undefined,
+      })
+
+      await expect(adapterWithoutOracle.isOraclePriceStale('NGN_USDC')).rejects.toThrow(ConfigurationError)
+    })
+
+    it('should return the boolean result of is_stale', async () => {
+      const { rpc, scValToNative } = await import('@stellar/stellar-sdk')
+
+      vi.mocked(rpc.Api.isSimulationSuccess).mockReturnValue(true)
+      vi.mocked(scValToNative).mockReturnValueOnce(true)
+      mockServer.simulateTransaction.mockResolvedValue({
+        result: { retval: {} },
+      })
+
+      await expect(adapter.isOraclePriceStale('NGN_USDC')).resolves.toBe(true)
     })
   })
 

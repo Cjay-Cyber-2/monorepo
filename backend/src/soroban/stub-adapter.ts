@@ -11,6 +11,7 @@ import {
      RegisterRentToOwnDealParams,
      RecordRentToOwnEquityPaymentParams,
      RentToOwnDealActionParams,
+     OraclePriceReading,
 } from './adapter.js'
 import { SorobanConfig } from './client.js'
 import { RawReceiptEvent } from '../indexer/event-parser.js'
@@ -283,5 +284,21 @@ async requestRentRelease(params: RequestRentReleaseParams): Promise<void> {
           const record = StubSorobanAdapter.stubReputations.get(tenantId) ?? null
           logger.debug('Soroban stub: getTenantReputation', { tenantId, found: record !== null })
           return record
+     }
+
+     /**
+      * Deterministic stub price: matches the default FX_RATE_NGN_PER_USDC
+      * (1600) scaled to the contract's 7-decimal precision, always fresh.
+      */
+     async getOraclePrice(pair: string): Promise<OraclePriceReading> {
+          const decimals = 7
+          const price = 1600n * 10n ** BigInt(decimals)
+          logger.debug('Soroban stub: getOraclePrice', { pair, price: price.toString() })
+          return { price, decimals, updatedAt: Math.floor(Date.now() / 1000), sequence: 1 }
+     }
+
+     async isOraclePriceStale(pair: string): Promise<boolean> {
+          logger.debug('Soroban stub: isOraclePriceStale', { pair })
+          return false
      }
 }
