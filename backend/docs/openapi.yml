@@ -2435,6 +2435,29 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /api/staking/mvp-position:
+    get:
+      summary: Get MVP staking utilization position
+      description: Read the additive MVP pool's total, used, unused, and claimable stake.
+      operationId: getMvpStakingPosition
+      tags:
+        - Staking
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: MVP staking position retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MvpStakingPositionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+
   /api/staking/quote:
     post:
       summary: Get staking quote
@@ -4090,6 +4113,22 @@ components:
               description: Amount of rewards available for claiming in USDC
               pattern: '^\d+(\.\d{1,6})?$'
               example: "50.250000"
+
+    MvpStakingPositionResponse:
+      type: object
+      required: [success, position]
+      properties:
+        success:
+          type: boolean
+          example: true
+        position:
+          type: object
+          required: [staked, used, unused, claimable]
+          properties:
+            staked: { type: string, example: "1000.000000" }
+            used: { type: string, description: Stake locked for an authorized protocol use, example: "250.000000" }
+            unused: { type: string, description: Stake still available to unstake, example: "750.000000" }
+            claimable: { type: string, example: "50.250000" }
 
   responses:
     Error:

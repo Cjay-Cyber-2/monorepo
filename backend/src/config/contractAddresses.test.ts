@@ -33,6 +33,15 @@ describe('contract address config', () => {
     ).toThrow('Invalid Soroban contract ID in SOROBAN_ORACLE_PRICE_FEEDS_ID')
   })
 
+  it('recognizes SOROBAN_MVP_STAKING_POOL_ID (issue #1493)', () => {
+    expect(CONTRACT_ENV_VARS.mvpStakingPool).toBe('SOROBAN_MVP_STAKING_POOL_ID')
+
+    const addresses = loadContractAddresses({
+      SOROBAN_MVP_STAKING_POOL_ID: VALID_CONTRACT_ID,
+    })
+    expect(addresses.mvpStakingPool).toBe(VALID_CONTRACT_ID)
+  })
+
   it('fails fast with the offending environment variable', () => {
     expect(() =>
       loadContractAddresses({

@@ -3,6 +3,8 @@
 import {
   claimRewards,
   getStakingPosition,
+  getMvpStakingPosition,
+  MvpStakingPositionResponse,
   stakeTokens,
   StakingPositionReponse,
   unstakeTokens,
@@ -32,6 +34,7 @@ export default function StakingPage() {
   const { isFrozen, freezeReason } = useRiskState();
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [stakingPosition, setStakingPosition] = useState<StakingPositionReponse | null>(null);
+  const [mvpPosition, setMvpPosition] = useState<MvpStakingPositionResponse | null>(null);
   const [ngnBalance, setNgnBalance] = useState<NgnBalanceResponse | null>(null);
   const [stakingMode, setStakingMode] = useState<StakingMode>("ngn_balance");
   const [stakeAmount, setStakeAmount] = useState("");
@@ -75,6 +78,9 @@ export default function StakingPage() {
       .catch((err: Error) => {
         console.error("Failed to fetch staking position", err);
       });
+    getMvpStakingPosition(walletAddress)
+      .then((data) => setMvpPosition(data))
+      .catch((err: Error) => console.error("Failed to fetch MVP staking position", err));
   }, [walletAddress]);
 
   useEffect(() => {
@@ -103,6 +109,7 @@ export default function StakingPage() {
       
       const pos = await getStakingPosition(walletInfo.publicKey);
       setStakingPosition(pos);
+      setMvpPosition(await getMvpStakingPosition(walletInfo.publicKey));
     } catch (err: any) {
       setStatus(err.message || "Failed to connect Stellar wallet");
       handleError(err, "Failed to connect Stellar wallet");
@@ -169,6 +176,7 @@ export default function StakingPage() {
 
         const updatedPosition = await getStakingPosition(walletAddress);
         setStakingPosition(updatedPosition);
+        setMvpPosition(await getMvpStakingPosition(walletAddress));
         setStakeAmount("");
       }
     } catch (err: any) {
@@ -349,6 +357,28 @@ export default function StakingPage() {
           
           {/* Hero Stats */}
           <PositionCard position={stakingPosition?.position || null} />
+
+          <Card className="border-2 border-foreground/10 bg-card shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-bold">MVP pool utilization</CardTitle>
+              <CardDescription className="text-xs">
+                Experimental pool balance, including stake reserved by an authorized protocol consumer.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                ["Total staked", mvpPosition?.position.staked],
+                ["Used", mvpPosition?.position.used],
+                ["Unused", mvpPosition?.position.unused],
+                ["Claimable", mvpPosition?.position.claimable],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-lg border border-foreground/10 bg-muted/20 p-3">
+                  <div className="text-[10px] font-bold uppercase text-muted-foreground">{label}</div>
+                  <div className="mt-1 font-mono text-sm font-black">{value ?? "0.000000"} USDC</div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
 
           {/* Action grid (Stake / Unstake / Claim) */}
           <div className="grid gap-6 md:grid-cols-12">

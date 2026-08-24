@@ -217,6 +217,85 @@ export class RealSorobanAdapter implements SorobanAdapter {
     })
   }
 
+  private getMvpPoolId(): string {
+    if (!this.config.mvpStakingPoolId) {
+      throw new ConfigurationError('SOROBAN_MVP_STAKING_POOL_ID not configured')
+    }
+    return this.config.mvpStakingPoolId
+  }
+
+  private async getMvpValue(method: string, account: string): Promise<bigint> {
+    const contractId = this.getMvpPoolId()
+    const result = await this.invokeReadOnly(contractId, method, [
+      nativeToScVal(new Address(account)),
+    ])
+    return BigInt(scValToNative(result))
+  }
+
+  async mvpStakedBalance(account: string): Promise<bigint> {
+    return this.getMvpValue('staked_balance', account)
+  }
+
+  async usedStake(account: string): Promise<bigint> {
+    return this.getMvpValue('used_stake', account)
+  }
+
+  async unusedStake(account: string): Promise<bigint> {
+    return this.getMvpValue('unused_stake', account)
+  }
+
+  async claimable(account: string): Promise<bigint> {
+    return this.getMvpValue('claimable', account)
+  }
+
+  private async executeMvpAdminOperation(
+    operation: 'stake' | 'unstake' | 'claim' | 'utilize_stake',
+    args: xdr.ScVal[],
+  ): Promise<string> {
+    const contractId = this.getMvpPoolId()
+    if (!this.config.adminSecret) {
+      throw new ConfigurationError(`SOROBAN_ADMIN_SECRET not configured for MVP ${operation}`)
+    }
+    return this.adminSigningService.executeAdminOperation({
+      contractId,
+      operation,
+      args,
+      networkPassphrase: this.config.networkPassphrase,
+      adminSecret: this.config.adminSecret,
+      server: this.server,
+    })
+  }
+
+  async stake(account: string, amount: bigint): Promise<string> {
+    return this.executeMvpAdminOperation('stake', [
+      nativeToScVal(new Address(account)),
+      nativeToScVal(amount, { type: 'i128' }),
+    ])
+  }
+
+  async unstake(account: string, amount: bigint): Promise<string> {
+    return this.executeMvpAdminOperation('unstake', [
+      nativeToScVal(new Address(account)),
+      nativeToScVal(amount, { type: 'i128' }),
+    ])
+  }
+
+  async utilizeStake(user: string, amount: bigint): Promise<string> {
+    if (!this.config.adminSecret) {
+      throw new ConfigurationError('SOROBAN_ADMIN_SECRET not configured for MVP utilize_stake')
+    }
+    const adminAddress = Keypair.fromSecret(this.config.adminSecret).publicKey()
+    return this.executeMvpAdminOperation('utilize_stake', [
+      nativeToScVal(new Address(adminAddress)),
+      nativeToScVal(new Address(user)),
+      nativeToScVal(amount, { type: 'i128' }),
+    ])
+  }
+
+  async claim(account: string): Promise<string> {
+    return this.executeMvpAdminOperation('claim', [nativeToScVal(new Address(account))])
+  }
+
   /**
    * Record a receipt on-chain.
    * 

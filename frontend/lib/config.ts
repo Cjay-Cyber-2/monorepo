@@ -18,6 +18,16 @@ export interface StakingPositionReponse {
   }
 }
 
+export interface MvpStakingPositionResponse {
+  success: boolean;
+  position: {
+    staked: string;
+    used: string;
+    unused: string;
+    claimable: string;
+  };
+}
+
 
 export interface TxResponse {
   success: boolean
@@ -38,6 +48,12 @@ export function getStakingPosition(walletAddress?: string | null): Promise<Staki
     headers["x-wallet-address"] = walletAddress;
   }
   return apiFetch<StakingPositionReponse>("/api/staking/position", { headers });
+}
+
+export function getMvpStakingPosition(walletAddress?: string | null): Promise<MvpStakingPositionResponse> {
+  const headers: Record<string, string> = {};
+  if (walletAddress) headers["x-wallet-address"] = walletAddress;
+  return apiFetch<MvpStakingPositionResponse>("/api/staking/mvp-position", { headers });
 }
 
 

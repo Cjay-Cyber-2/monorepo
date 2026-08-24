@@ -8,6 +8,7 @@ export const CONTRACT_ENV_VARS = {
   whistleblowerValidation: 'SOROBAN_WHISTLEBLOWER_VALIDATION_ID',
   stakingPool: 'SOROBAN_STAKING_POOL_ID',
   stakingRewards: 'SOROBAN_STAKING_REWARDS_ID',
+  mvpStakingPool: 'SOROBAN_MVP_STAKING_POOL_ID',
   timelock: 'SOROBAN_TIMELOCK_ID',
   inspectorBond: 'SOROBAN_INSPECTOR_BOND_ID',
   tenantReputation: 'SOROBAN_TENANT_REPUTATION_ID',
