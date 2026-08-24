@@ -140,6 +140,15 @@ export interface SorobanAdapter {
   debit(account: string, amount: bigint): Promise<void>
   getStakedBalance(account: string): Promise<bigint>
   getClaimableRewards(account: string): Promise<bigint>
+  // MVP staking pool (#1493), additive to the legacy staking pair.
+  stake?(account: string, amount: bigint): Promise<string>
+  unstake?(account: string, amount: bigint): Promise<string>
+  mvpStakedBalance?(account: string): Promise<bigint>
+  usedStake?(account: string): Promise<bigint>
+  unusedStake?(account: string): Promise<bigint>
+  utilizeStake?(user: string, amount: bigint): Promise<string>
+  claimable?(account: string): Promise<bigint>
+  claim?(account: string): Promise<string>
   recordReceipt(params: RecordReceiptParams, hooks?: TxBroadcastHooks): Promise<void>
   getConfig(): SorobanConfig
   getReceiptEvents(fromLedger: number | null): Promise<RawReceiptEvent[]>

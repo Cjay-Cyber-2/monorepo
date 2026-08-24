@@ -102,6 +102,52 @@ export class StubSorobanAdapter implements SorobanAdapter {
           return claimable
      }
 
+     async usedStake(account: string): Promise<bigint> {
+          const staked = await this.getMvpStakedBalance(account)
+          const hash = this.simpleHash(`used:${this.config.mvpStakingPoolId ?? 'stub'}:${account}`)
+          return BigInt(hash % (Number(staked / 1_000_000n) + 1)) * 1_000_000n
+     }
+
+     async unusedStake(account: string): Promise<bigint> {
+          const staked = await this.getMvpStakedBalance(account)
+          const used = await this.usedStake(account)
+          return staked - used
+     }
+
+     async claimable(account: string): Promise<bigint> {
+          return this.getMvpClaimable(account)
+     }
+
+     async stake(account: string, amount: bigint): Promise<string> {
+          logger.info('Soroban stub: mvp stake', { account, amount: amount.toString() })
+          return 'stub_tx_hash_mvp_stake'
+     }
+
+     async unstake(account: string, amount: bigint): Promise<string> {
+          logger.info('Soroban stub: mvp unstake', { account, amount: amount.toString() })
+          return 'stub_tx_hash_mvp_unstake'
+     }
+
+     async utilizeStake(user: string, amount: bigint): Promise<string> {
+          logger.info('Soroban stub: mvp utilizeStake', { user, amount: amount.toString() })
+          return 'stub_tx_hash_mvp_utilize_stake'
+     }
+
+     async claim(account: string): Promise<string> {
+          logger.info('Soroban stub: mvp claim', { account })
+          return 'stub_tx_hash_mvp_claim'
+     }
+
+     private async getMvpStakedBalance(account: string): Promise<bigint> {
+          const hash = this.simpleHash(`mvp-staked:${this.config.mvpStakingPoolId ?? 'stub'}:${account}`)
+          return BigInt(hash % 5_000) * 1_000_000n
+     }
+
+     private async getMvpClaimable(account: string): Promise<bigint> {
+          const hash = this.simpleHash(`mvp-claimable:${this.config.mvpStakingPoolId ?? 'stub'}:${account}`)
+          return BigInt(hash % 250) * 1_000_000n
+     }
+
      /**
       * Stub recordReceipt: logs the call but performs no on-chain work.
       *
