@@ -31,6 +31,12 @@ export type AdminOperation =
   | 'unstake'
   | 'claim'
   | 'utilize_stake'
+  | 'delegate'
+  | 'request_undelegate'
+  | 'complete_undelegate'
+  | 'claim_delegatee_rewards'
+  | 'set_commission'
+  | 'claim_commission'
 
 /**
  * Parameters for admin operations
@@ -171,6 +177,12 @@ export class AdminSigningService {
       'unstake',
       'claim',
       'utilize_stake',
+      'delegate',
+      'request_undelegate',
+      'complete_undelegate',
+      'claim_delegatee_rewards',
+      'set_commission',
+      'claim_commission',
     ]
     if (!allowedOperations.includes(params.operation)) {
       throw new ConfigurationError(

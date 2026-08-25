@@ -134,6 +134,45 @@ export interface TenantReputationRecord {
   lastUpdated: bigint
 }
 
+/**
+ * A single delegation row from stake_delegation's `get_delegations`, mirroring
+ * the contract's `Delegation` struct.
+ *
+ * `amount` is in stake_delegation's own units (USDC, 6 decimals). Note that
+ * stake_delegation keeps a *separate* stake ledger from staking_pool — see
+ * `DelegationPosition` — so this amount is never a slice of the staking_pool
+ * position surfaced by `getStakedBalance`.
+ */
+export interface DelegationRecord {
+  delegatee: string
+  amount: bigint
+  activatedEpoch: number
+}
+
+/**
+ * A delegator's full position inside stake_delegation. `staked` is the balance
+ * held by stake_delegation itself (`staked_balance`), NOT the staking_pool
+ * position; `delegated` is the part of it currently routed to delegatees and
+ * `free` is the remainder the contract will let the user delegate or unstake.
+ */
+export interface DelegationPosition {
+  staked: bigint
+  delegated: bigint
+  free: bigint
+  currentEpoch: number
+  delegations: DelegationRecord[]
+}
+
+/**
+ * What a delegatee has earned: net rewards after their commission split, plus
+ * the commission itself. The contract exposes no getter for the configured
+ * commission *rate*, so only the two balances are readable off-chain.
+ */
+export interface DelegateeEarnings {
+  claimable: bigint
+  commissionClaimable: bigint
+}
+
 export interface SorobanAdapter {
   getBalance(account: string): Promise<bigint>
   credit(account: string, amount: bigint): Promise<void>
@@ -195,6 +234,21 @@ export interface SorobanAdapter {
   recordRentToOwnEquityPayment?(params: RecordRentToOwnEquityPaymentParams): Promise<void>
   completeRentToOwnDeal?(params: RentToOwnDealActionParams): Promise<void>
   defaultRentToOwnDeal?(params: RentToOwnDealActionParams): Promise<void>
+
+  // stake_delegation contract (#1489) — a standalone delegated-staking ledger,
+  // disjoint from staking_pool/staking_rewards. See real-adapter.ts for the
+  // signer-model caveat on the write methods.
+  delegateStake?(delegator: string, delegatee: string, amount: bigint): Promise<string>
+  requestUndelegate?(delegator: string, delegatee: string, amount: bigint): Promise<string>
+  completeUndelegate?(delegator: string, delegatee: string): Promise<string>
+  claimDelegateeRewards?(delegatee: string): Promise<string>
+  setDelegateeCommission?(delegatee: string, rateBps: number): Promise<string>
+  claimDelegateeCommission?(delegatee: string): Promise<string>
+  getDelegations?(delegator: string): Promise<DelegationRecord[]>
+  getDelegationStakedBalance?(account: string): Promise<bigint>
+  getDelegationEpoch?(): Promise<number>
+  getDelegateeClaimable?(delegatee: string): Promise<bigint>
+  getDelegateeCommissionClaimable?(delegatee: string): Promise<bigint>
 
   // oracle_price_feeds contract — read-only price queries (issue #1488)
   getOraclePrice?(pair: string): Promise<OraclePriceReading>

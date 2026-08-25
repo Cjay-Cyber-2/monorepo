@@ -25,6 +25,7 @@ import {
   RecordRentToOwnEquityPaymentParams,
   RentToOwnDealActionParams,
   OraclePriceReading,
+  DelegationRecord,
 } from './adapter.js'
 import { SorobanConfig } from './client.js'
 import { RawReceiptEvent } from '../indexer/event-parser.js'
@@ -294,6 +295,147 @@ export class RealSorobanAdapter implements SorobanAdapter {
 
   async claim(account: string): Promise<string> {
     return this.executeMvpAdminOperation('claim', [nativeToScVal(new Address(account))])
+  }
+
+  // ── stake_delegation (#1489) ───────────────────────────────────────────────
+  //
+  // stake_delegation is a standalone delegated-staking ledger: it keeps its own
+  // StakedBalance/TotalStaked/RewardIndex and never calls staking_pool, so none
+  // of these reads or writes touch the staking_pool position exposed by
+  // getStakedBalance/getClaimableRewards.
+  //
+  // Signer model: every write below is guarded on-chain by the *acting party's*
+  // require_auth() (delegator for delegate/undelegate, delegatee for the
+  // reward/commission calls) — not by the admin. Submitting through
+  // adminSigningService therefore only authorises when the platform admin key
+  // is itself the acting account, which is the same constraint the existing
+  // mvp_staking_pool wiring carries. The acting address is passed explicitly as
+  // the first contract argument, so a user-signed submission path can replace
+  // executeDelegationOperation without changing any caller.
+
+  private getStakeDelegationId(): string {
+    if (!this.config.stakeDelegationId) {
+      throw new ConfigurationError('SOROBAN_STAKE_DELEGATION_ID not configured')
+    }
+    return this.config.stakeDelegationId
+  }
+
+  private async executeDelegationOperation(
+    operation:
+      | 'delegate'
+      | 'request_undelegate'
+      | 'complete_undelegate'
+      | 'claim_delegatee_rewards'
+      | 'set_commission'
+      | 'claim_commission',
+    args: xdr.ScVal[],
+  ): Promise<string> {
+    const contractId = this.getStakeDelegationId()
+    if (!this.config.adminSecret) {
+      throw new ConfigurationError(
+        `SOROBAN_ADMIN_SECRET not configured for stake_delegation ${operation}`,
+      )
+    }
+    return this.adminSigningService.executeAdminOperation({
+      contractId,
+      operation,
+      args,
+      networkPassphrase: this.config.networkPassphrase,
+      adminSecret: this.config.adminSecret,
+      server: this.server,
+    })
+  }
+
+  async delegateStake(delegator: string, delegatee: string, amount: bigint): Promise<string> {
+    return this.executeDelegationOperation('delegate', [
+      nativeToScVal(Address.fromString(delegator)),
+      nativeToScVal(Address.fromString(delegatee)),
+      nativeToScVal(amount, { type: 'i128' }),
+    ])
+  }
+
+  async requestUndelegate(delegator: string, delegatee: string, amount: bigint): Promise<string> {
+    return this.executeDelegationOperation('request_undelegate', [
+      nativeToScVal(Address.fromString(delegator)),
+      nativeToScVal(Address.fromString(delegatee)),
+      nativeToScVal(amount, { type: 'i128' }),
+    ])
+  }
+
+  async completeUndelegate(delegator: string, delegatee: string): Promise<string> {
+    return this.executeDelegationOperation('complete_undelegate', [
+      nativeToScVal(Address.fromString(delegator)),
+      nativeToScVal(Address.fromString(delegatee)),
+    ])
+  }
+
+  async claimDelegateeRewards(delegatee: string): Promise<string> {
+    return this.executeDelegationOperation('claim_delegatee_rewards', [
+      nativeToScVal(Address.fromString(delegatee)),
+    ])
+  }
+
+  async setDelegateeCommission(delegatee: string, rateBps: number): Promise<string> {
+    return this.executeDelegationOperation('set_commission', [
+      nativeToScVal(Address.fromString(delegatee)),
+      nativeToScVal(rateBps, { type: 'u32' }),
+    ])
+  }
+
+  async claimDelegateeCommission(delegatee: string): Promise<string> {
+    return this.executeDelegationOperation('claim_commission', [
+      nativeToScVal(Address.fromString(delegatee)),
+    ])
+  }
+
+  async getDelegations(delegator: string): Promise<DelegationRecord[]> {
+    const retval = await this.invokeReadOnly(this.getStakeDelegationId(), 'get_delegations', [
+      nativeToScVal(Address.fromString(delegator)),
+    ])
+    const native = scValToNative(retval) as Array<{
+      delegatee: string
+      amount: bigint | number | string
+      activated_epoch: bigint | number | string
+    }>
+    return (native ?? []).map((row) => ({
+      delegatee: String(row.delegatee),
+      amount: BigInt(row.amount),
+      activatedEpoch: Number(row.activated_epoch),
+    }))
+  }
+
+  async getDelegationStakedBalance(account: string): Promise<bigint> {
+    const retval = await this.invokeReadOnly(this.getStakeDelegationId(), 'staked_balance', [
+      nativeToScVal(Address.fromString(account)),
+    ])
+    return BigInt(scValToNative(retval))
+  }
+
+  async getDelegationEpoch(): Promise<number> {
+    const retval = await this.invokeReadOnly(
+      this.getStakeDelegationId(),
+      'current_epoch_num',
+      [],
+    )
+    return Number(scValToNative(retval))
+  }
+
+  async getDelegateeClaimable(delegatee: string): Promise<bigint> {
+    const retval = await this.invokeReadOnly(
+      this.getStakeDelegationId(),
+      'get_delegatee_claimable',
+      [nativeToScVal(Address.fromString(delegatee))],
+    )
+    return BigInt(scValToNative(retval))
+  }
+
+  async getDelegateeCommissionClaimable(delegatee: string): Promise<bigint> {
+    const retval = await this.invokeReadOnly(
+      this.getStakeDelegationId(),
+      'get_commission_claimable',
+      [nativeToScVal(Address.fromString(delegatee))],
+    )
+    return BigInt(scValToNative(retval))
   }
 
   /**
