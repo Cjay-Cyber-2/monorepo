@@ -2458,6 +2458,251 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /api/staking/delegation/position:
+    get:
+      summary: Get delegated-staking position
+      description: >-
+        The caller's position inside the stake_delegation contract: the balance
+        that contract holds for them, how much of it is currently delegated, how
+        much is free, and the per-delegatee breakdown. This is a separate ledger
+        from staking_pool — it is never a slice of /api/staking/position.
+      operationId: getDelegationPosition
+      tags:
+        - Staking
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Delegated-staking position retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DelegationPositionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/staking/delegation/delegatee-earnings:
+    get:
+      summary: Get delegatee earnings
+      description: >-
+        Net rewards claimable by the caller acting as a delegatee (gross minus
+        their commission), plus the accrued commission balance itself.
+      operationId: getDelegateeEarnings
+      tags:
+        - Staking
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Delegatee earnings retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DelegateeEarningsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/staking/delegation/delegate:
+    post:
+      summary: Delegate stake to a delegatee
+      description: Routes part of the caller's free stake_delegation balance to a delegatee.
+      operationId: delegateStake
+      tags:
+        - Staking
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DelegateRequest'
+      responses:
+        '200':
+          description: Stake delegated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DelegationTxResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/staking/delegation/undelegate/request:
+    post:
+      summary: Request undelegation
+      description: >-
+        Opens the contract's undelegation cooldown. The stake stays delegated
+        until the matching complete call succeeds.
+      operationId: requestUndelegate
+      tags:
+        - Staking
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DelegateRequest'
+      responses:
+        '202':
+          description: Undelegation requested; cooldown started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DelegationTxResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/staking/delegation/undelegate/complete:
+    post:
+      summary: Complete a pending undelegation
+      description: >-
+        Settles a pending undelegation. The contract rejects this until its
+        configured cooldown (7 days by default) has elapsed.
+      operationId: completeUndelegate
+      tags:
+        - Staking
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [delegatee]
+              properties:
+                delegatee:
+                  type: string
+                  description: Delegatee whose pending undelegation should be settled
+                  example: GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H
+      responses:
+        '200':
+          description: Undelegation completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DelegationTxResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/staking/delegation/commission:
+    post:
+      summary: Set the caller's delegatee commission
+      description: Sets the commission, in basis points, charged on stake delegated to the caller.
+      operationId: setDelegateeCommission
+      tags:
+        - Staking
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rateBps]
+              properties:
+                rateBps:
+                  type: integer
+                  minimum: 0
+                  maximum: 10000
+                  description: Commission in basis points
+                  example: 1000
+      responses:
+        '200':
+          description: Commission updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, txHash, rateBps]
+                properties:
+                  success: { type: boolean, example: true }
+                  txHash: { type: string }
+                  rateBps: { type: integer, example: 1000 }
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/staking/delegation/claim-rewards:
+    post:
+      summary: Claim delegatee rewards
+      description: Claims the caller's net delegatee rewards (gross minus their commission).
+      operationId: claimDelegateeRewards
+      tags:
+        - Staking
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Delegatee rewards claimed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DelegationTxResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /api/staking/delegation/claim-commission:
+    post:
+      summary: Claim delegatee commission
+      description: Claims the caller's accrued commission balance.
+      operationId: claimDelegateeCommission
+      tags:
+        - Staking
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Commission claimed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DelegationTxResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+
   /api/staking/quote:
     post:
       summary: Get staking quote
@@ -4129,6 +4374,75 @@ components:
             used: { type: string, description: Stake locked for an authorized protocol use, example: "250.000000" }
             unused: { type: string, description: Stake still available to unstake, example: "750.000000" }
             claimable: { type: string, example: "50.250000" }
+
+    DelegationPositionResponse:
+      type: object
+      required: [success, position]
+      properties:
+        success:
+          type: boolean
+          example: true
+        position:
+          type: object
+          required: [staked, delegated, free, currentEpoch, delegations]
+          properties:
+            staked:
+              type: string
+              description: Balance held by stake_delegation for the caller (NOT the staking_pool position)
+              example: "1000.000000"
+            delegated: { type: string, description: Portion currently routed to delegatees, example: "250.000000" }
+            free: { type: string, description: Portion still available to delegate or unstake, example: "750.000000" }
+            currentEpoch: { type: integer, description: stake_delegation's current epoch number, example: 4 }
+            delegations:
+              type: array
+              items:
+                type: object
+                required: [delegatee, amountUsdc, activatedEpoch]
+                properties:
+                  delegatee: { type: string, example: GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H }
+                  amountUsdc: { type: string, example: "250.000000" }
+                  activatedEpoch: { type: integer, example: 2 }
+
+    DelegateeEarningsResponse:
+      type: object
+      required: [success, delegatee, earnings]
+      properties:
+        success: { type: boolean, example: true }
+        delegatee: { type: string, example: GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H }
+        earnings:
+          type: object
+          required: [claimable, commissionClaimable]
+          properties:
+            claimable: { type: string, description: Net rewards after the commission split, example: "45.000000" }
+            commissionClaimable: { type: string, description: Accrued commission balance, example: "5.000000" }
+
+    DelegateRequest:
+      type: object
+      required: [delegatee, amountUsdc]
+      properties:
+        delegatee:
+          type: string
+          pattern: '^G[A-Z2-7]{55}$'
+          description: Stellar address of the delegatee
+          example: GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H
+        amountUsdc:
+          type: string
+          pattern: '^\d+(\.\d{1,6})?$'
+          description: Amount in USDC (canonical unit)
+          example: "250.000000"
+
+    DelegationTxResponse:
+      type: object
+      required: [success, txHash]
+      properties:
+        success: { type: boolean, example: true }
+        txHash: { type: string, description: Stellar transaction hash for the submitted contract call }
+        message: { type: string, example: Stake delegated }
+        delegation:
+          type: object
+          properties:
+            delegatee: { type: string }
+            amountUsdc: { type: string }
 
   responses:
     Error:

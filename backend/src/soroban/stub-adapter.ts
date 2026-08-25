@@ -12,6 +12,7 @@ import {
      RecordRentToOwnEquityPaymentParams,
      RentToOwnDealActionParams,
      OraclePriceReading,
+     DelegationRecord,
 } from './adapter.js'
 import { SorobanConfig } from './client.js'
 import { RawReceiptEvent } from '../indexer/event-parser.js'
@@ -40,6 +41,10 @@ export class StubSorobanAdapter implements SorobanAdapter {
           this.stubBalances.clear()
           this.stubBonds.clear()
           this.stubReputations.clear()
+          this.stubDelegationStakes.clear()
+          this.stubDelegations.clear()
+          this.stubPendingUndelegations.clear()
+          this.stubDelegateeCommissionBps.clear()
           logger.debug('Soroban stub: static reset complete (balances, bonds, and reputations cleared)')
      }
 
@@ -146,6 +151,145 @@ export class StubSorobanAdapter implements SorobanAdapter {
      private async getMvpClaimable(account: string): Promise<bigint> {
           const hash = this.simpleHash(`mvp-claimable:${this.config.mvpStakingPoolId ?? 'stub'}:${account}`)
           return BigInt(hash % 250) * 1_000_000n
+     }
+
+     // ── stake_delegation (#1489) ─────────────────────────────────────────
+     // In-memory delegation ledger so local dev and route tests exercise the
+     // real delegate → request → complete flow (including the cooldown gate)
+     // without a chain. Kept deliberately separate from the staking_pool stub
+     // state above, mirroring the contract's own separate stake ledger.
+
+     private static stubDelegationStakes = new Map<string, bigint>()
+     private static stubDelegations = new Map<string, DelegationRecord[]>()
+     private static stubPendingUndelegations = new Map<string, { amount: bigint; requestedAtMs: number }>()
+     private static stubDelegateeCommissionBps = new Map<string, number>()
+     private static stubEpoch = 1
+
+     /** Cooldown the stub enforces, mirroring the contract's 7-day default. */
+     public static readonly STUB_UNDELEGATION_COOLDOWN_MS = 604_800_000
+
+     private delegationStakeOf(account: string): bigint {
+          const existing = StubSorobanAdapter.stubDelegationStakes.get(account)
+          if (existing !== undefined) return existing
+          const hash = this.simpleHash(`delegation-staked:${this.config.stakeDelegationId ?? 'stub'}:${account}`)
+          const seeded = BigInt(hash % 5_000) * 1_000_000n
+          StubSorobanAdapter.stubDelegationStakes.set(account, seeded)
+          return seeded
+     }
+
+     private totalDelegated(delegator: string): bigint {
+          const rows = StubSorobanAdapter.stubDelegations.get(delegator) ?? []
+          return rows.reduce((sum, row) => sum + row.amount, 0n)
+     }
+
+     async delegateStake(delegator: string, delegatee: string, amount: bigint): Promise<string> {
+          if (amount <= 0n) throw new Error('InvalidAmount: delegation amount must be positive')
+          const free = this.delegationStakeOf(delegator) - this.totalDelegated(delegator)
+          if (free < amount) {
+               throw new Error(`InsufficientStake: ${free.toString()} free < ${amount.toString()} requested`)
+          }
+          const rows = [...(StubSorobanAdapter.stubDelegations.get(delegator) ?? [])]
+          const existing = rows.findIndex((row) => row.delegatee === delegatee)
+          if (existing >= 0) {
+               rows[existing] = { ...rows[existing], amount: rows[existing].amount + amount }
+          } else {
+               rows.push({ delegatee, amount, activatedEpoch: StubSorobanAdapter.stubEpoch })
+          }
+          StubSorobanAdapter.stubDelegations.set(delegator, rows)
+          logger.info('Soroban stub: delegate', { delegator, delegatee, amount: amount.toString() })
+          return 'stub_tx_hash_delegate'
+     }
+
+     async requestUndelegate(delegator: string, delegatee: string, amount: bigint): Promise<string> {
+          if (amount <= 0n) throw new Error('InvalidAmount: undelegation amount must be positive')
+          const rows = StubSorobanAdapter.stubDelegations.get(delegator) ?? []
+          const row = rows.find((r) => r.delegatee === delegatee)
+          if (!row) throw new Error(`DelegationNotFound: ${delegator} has no delegation to ${delegatee}`)
+          if (row.amount < amount) {
+               throw new Error(`InsufficientStake: delegated ${row.amount.toString()} < ${amount.toString()}`)
+          }
+          StubSorobanAdapter.stubPendingUndelegations.set(`${delegator}:${delegatee}`, {
+               amount,
+               requestedAtMs: Date.now(),
+          })
+          logger.info('Soroban stub: requestUndelegate', { delegator, delegatee, amount: amount.toString() })
+          return 'stub_tx_hash_request_undelegate'
+     }
+
+     async completeUndelegate(delegator: string, delegatee: string): Promise<string> {
+          const key = `${delegator}:${delegatee}`
+          const pending = StubSorobanAdapter.stubPendingUndelegations.get(key)
+          if (!pending) throw new Error(`NoPendingUndelegation: nothing pending for ${key}`)
+          if (Date.now() - pending.requestedAtMs < StubSorobanAdapter.STUB_UNDELEGATION_COOLDOWN_MS) {
+               throw new Error('CooldownNotElapsed: undelegation cooldown has not elapsed')
+          }
+          const rows = (StubSorobanAdapter.stubDelegations.get(delegator) ?? [])
+               .map((row) =>
+                    row.delegatee === delegatee ? { ...row, amount: row.amount - pending.amount } : row,
+               )
+               .filter((row) => row.amount > 0n)
+          StubSorobanAdapter.stubDelegations.set(delegator, rows)
+          StubSorobanAdapter.stubPendingUndelegations.delete(key)
+          logger.info('Soroban stub: completeUndelegate', { delegator, delegatee })
+          return 'stub_tx_hash_complete_undelegate'
+     }
+
+     /**
+      * Back-dates every pending undelegation past the cooldown, standing in for
+      * the ledger-timestamp advance the contract's own tests use.
+      */
+     public static _testOnlyElapseUndelegationCooldown(): void {
+          for (const [key, pending] of this.stubPendingUndelegations) {
+               this.stubPendingUndelegations.set(key, {
+                    ...pending,
+                    requestedAtMs: pending.requestedAtMs - this.STUB_UNDELEGATION_COOLDOWN_MS - 1_000,
+               })
+          }
+     }
+
+     async claimDelegateeRewards(delegatee: string): Promise<string> {
+          logger.info('Soroban stub: claimDelegateeRewards', { delegatee })
+          return 'stub_tx_hash_claim_delegatee_rewards'
+     }
+
+     async setDelegateeCommission(delegatee: string, rateBps: number): Promise<string> {
+          if (rateBps > 10_000) throw new Error('CommissionTooHigh: rate must be <= 10000 bps')
+          StubSorobanAdapter.stubDelegateeCommissionBps.set(delegatee, rateBps)
+          logger.info('Soroban stub: setDelegateeCommission', { delegatee, rateBps })
+          return 'stub_tx_hash_set_commission'
+     }
+
+     async claimDelegateeCommission(delegatee: string): Promise<string> {
+          logger.info('Soroban stub: claimDelegateeCommission', { delegatee })
+          return 'stub_tx_hash_claim_commission'
+     }
+
+     async getDelegations(delegator: string): Promise<DelegationRecord[]> {
+          return [...(StubSorobanAdapter.stubDelegations.get(delegator) ?? [])]
+     }
+
+     async getDelegationStakedBalance(account: string): Promise<bigint> {
+          return this.delegationStakeOf(account)
+     }
+
+     async getDelegationEpoch(): Promise<number> {
+          return StubSorobanAdapter.stubEpoch
+     }
+
+     /** Gross rewards accrued to a delegatee before the commission split. */
+     private grossDelegateeRewards(delegatee: string): bigint {
+          const hash = this.simpleHash(`delegatee-gross:${this.config.stakeDelegationId ?? 'stub'}:${delegatee}`)
+          return BigInt(hash % 250) * 1_000_000n
+     }
+
+     async getDelegateeClaimable(delegatee: string): Promise<bigint> {
+          const gross = this.grossDelegateeRewards(delegatee)
+          return gross - (await this.getDelegateeCommissionClaimable(delegatee))
+     }
+
+     async getDelegateeCommissionClaimable(delegatee: string): Promise<bigint> {
+          const rateBps = BigInt(StubSorobanAdapter.stubDelegateeCommissionBps.get(delegatee) ?? 0)
+          return (this.grossDelegateeRewards(delegatee) * rateBps) / 10_000n
      }
 
      /**

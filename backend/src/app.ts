@@ -27,6 +27,7 @@ import { createAdminRouter } from "./routes/admin.js"
 import { createDealsRouter } from "./routes/deals.js"
 import { createWhistleblowerRouter } from "./routes/whistleblower.js"
 import { createStakingRouter } from "./routes/staking.js"
+import { createStakingDelegationRouter } from "./routes/stakingDelegation.js"
 import { createWebhooksRouter } from "./routes/webhooks.js"
 import { createDepositsRouter } from "./routes/deposits.js"
 import { EarningsServiceImpl } from "./services/earnings.js"
@@ -797,6 +798,13 @@ export function createApp() {
     app.use("/api/admin", createSettlementAdminRouter());
     app.use("/api", createContractEventsRouter());
     app.use("/api/config/feature-flags", createFeatureFlagsRouter());
+    // Mounted ahead of "/api/staking" so the delegation prefix wins; the
+    // stake_delegation contract is a separate ledger from staking_pool.
+    app.use(
+      "/api/staking/delegation",
+      requireFlag("STAKING_ENABLED"),
+      createStakingDelegationRouter(sorobanAdapter, walletService, linkedAddressStore),
+    );
     app.use(
       "/api/staking",
       requireFlag("STAKING_ENABLED"),
@@ -886,6 +894,11 @@ export function createApp() {
   app.use("/api/v1/config/feature-flags", createFeatureFlagsRouter());
 
 
+  app.use(
+    "/api/v1/staking/delegation",
+    requireFlag("STAKING_ENABLED"),
+    createStakingDelegationRouter(sorobanAdapter, walletService, linkedAddressStore),
+  );
   app.use(
     "/api/v1/staking",
     requireFlag("STAKING_ENABLED"),

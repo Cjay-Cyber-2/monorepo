@@ -42,6 +42,19 @@ describe('contract address config', () => {
     expect(addresses.mvpStakingPool).toBe(VALID_CONTRACT_ID)
   })
 
+  it('recognizes SOROBAN_STAKE_DELEGATION_ID (issue #1489)', () => {
+    expect(CONTRACT_ENV_VARS.stakeDelegation).toBe('SOROBAN_STAKE_DELEGATION_ID')
+
+    const addresses = loadContractAddresses({
+      SOROBAN_STAKE_DELEGATION_ID: VALID_CONTRACT_ID,
+    })
+    expect(addresses.stakeDelegation).toBe(VALID_CONTRACT_ID)
+
+    expect(() =>
+      loadContractAddresses({ SOROBAN_STAKE_DELEGATION_ID: 'not-a-contract' }),
+    ).toThrow('Invalid Soroban contract ID in SOROBAN_STAKE_DELEGATION_ID')
+  })
+
   it('fails fast with the offending environment variable', () => {
     expect(() =>
       loadContractAddresses({
