@@ -131,16 +131,29 @@ export class RentWalletWorker {
       })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      const nextRetryAt = new Date(Date.now() + getBackoffMs(item.retryCount))
-      await outboxStore.updateStatus(item.id, OutboxStatus.FAILED, { error: errorMessage, nextRetryAt })
-      logger.warn('Rent wallet sync failed, will retry', {
-        outboxId: item.id,
-        account,
-        txType: item.txType,
-        retryCount: item.retryCount,
-        nextRetryAt: nextRetryAt.toISOString(),
-        error: errorMessage,
-      })
+      const currentRetryCount = item.retryCount || 0
+      const nextRetryAt = new Date(Date.now() + getBackoffMs(currentRetryCount))
+
+      if (currentRetryCount + 1 >= MAX_RENT_WALLET_RETRIES) {
+        await outboxStore.markDead(item.id, errorMessage)
+        logger.error('Rent wallet sync failed — dead-lettered', {
+          outboxId: item.id,
+          account,
+          txType: item.txType,
+          retryCount: currentRetryCount + 1,
+          lastError: errorMessage,
+        })
+      } else {
+        await outboxStore.updateStatus(item.id, OutboxStatus.FAILED, { error: errorMessage, nextRetryAt })
+        logger.warn('Rent wallet sync failed, will retry', {
+          outboxId: item.id,
+          account,
+          txType: item.txType,
+          retryCount: currentRetryCount,
+          nextRetryAt: nextRetryAt.toISOString(),
+          error: errorMessage,
+        })
+      }
     }
   }
 }
