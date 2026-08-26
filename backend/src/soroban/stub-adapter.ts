@@ -13,6 +13,7 @@ import {
      RentToOwnDealActionParams,
      OraclePriceReading,
      DelegationRecord,
+     OnChainReceipt,
 } from './adapter.js'
 import { SorobanConfig } from './client.js'
 import { RawReceiptEvent } from '../indexer/event-parser.js'
@@ -490,5 +491,24 @@ async requestRentRelease(params: RequestRentReleaseParams): Promise<void> {
      async isOraclePriceStale(pair: string): Promise<boolean> {
           logger.debug('Soroban stub: isOraclePriceStale', { pair })
           return false
+     }
+
+     // Direct query methods for transaction-receipt-contract (stub implementations)
+     async getReceiptById(txId: string): Promise<OnChainReceipt | null> {
+          logger.debug('Soroban stub: getReceiptById', { txId })
+          // Return null for non-existent receipts in stub mode
+          return null
+     }
+
+     async listReceiptsByDeal(dealId: string, limit: number, cursor?: number): Promise<OnChainReceipt[]> {
+          logger.debug('Soroban stub: listReceiptsByDeal', { dealId, limit, cursor })
+          // Return empty array in stub mode
+          return []
+     }
+
+     async listReceiptsByUser(userAddress: string, limit: number, cursor?: number): Promise<OnChainReceipt[]> {
+          logger.debug('Soroban stub: listReceiptsByUser', { userAddress, limit, cursor })
+          // Return empty array in stub mode
+          return []
      }
 }
