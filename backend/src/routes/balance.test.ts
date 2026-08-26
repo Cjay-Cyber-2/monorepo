@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import request from 'supertest'
 import express from 'express'
 import { createBalanceRouter } from './balance.js'
-import { authenticateToken, requirePermission } from '../middleware/auth.js'
+import { authenticateToken } from '../middleware/auth.js'
 import { StubSorobanAdapter } from '../soroban/stub-adapter.js'
 import { errorHandler } from '../middleware/errorHandler.js'
 import { requestIdMiddleware } from '../middleware/requestId.js'
@@ -21,10 +21,6 @@ vi.mock('../middleware/auth.js', () => ({
     }
     next()
   }),
-  requirePermission: (resource: string, action: string) => (req: any, res: any, next: any) => {
-    // For testing, allow all permissions
-    next()
-  },
 }))
 
 function buildApp(): express.Express {

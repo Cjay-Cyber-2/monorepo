@@ -1,10 +1,11 @@
 import { Router, type NextFunction, type Request, type Response } from 'express'
 import { SorobanAdapter } from '../soroban/adapter.js'
+import { authenticateToken, type AuthenticatedRequest } from '../middleware/auth.js'
 
 export function createBalanceRouter(adapter: SorobanAdapter) {
   const router = Router()
 
-  router.get('/balance/:account', async (req: Request, res: Response, next: NextFunction) => {
+  router.get('/balance/:account', authenticateToken, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const { account } = req.params
 
@@ -12,6 +13,13 @@ export function createBalanceRouter(adapter: SorobanAdapter) {
         return res.status(400).json({
           error: 'Account parameter is required',
         })
+      }
+
+      const userId = req.user?.id
+
+      // Enforce ownership: users can only access their own balance
+      if (userId && account !== userId) {
+        return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Forbidden' } })
       }
 
       const balance = await adapter.getBalance(account)
@@ -31,9 +39,23 @@ export function createBalanceRouter(adapter: SorobanAdapter) {
   })
 
   // Add endpoints for credit/debit operations
-  router.post('/balance/:account/credit', async (req: Request, res: Response, next: NextFunction) => {
+  router.post('/balance/:account/credit', authenticateToken, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const { account } = req.params
+
+      if (!account || account.trim() === '') {
+        return res.status(400).json({
+          error: 'Account parameter is required',
+        })
+      }
+
+      const userId = req.user?.id
+
+      // Enforce ownership: users can only credit their own account
+      if (userId && account !== userId) {
+        return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Forbidden' } })
+      }
+
       const { amount } = req.body
 
       if (!amount || typeof amount !== 'string') {
@@ -60,9 +82,23 @@ export function createBalanceRouter(adapter: SorobanAdapter) {
     }
   })
 
-  router.post('/balance/:account/debit', async (req: Request, res: Response, next: NextFunction) => {
+  router.post('/balance/:account/debit', authenticateToken, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const { account } = req.params
+
+      if (!account || account.trim() === '') {
+        return res.status(400).json({
+          error: 'Account parameter is required',
+        })
+      }
+
+      const userId = req.user?.id
+
+      // Enforce ownership: users can only debit their own account
+      if (userId && account !== userId) {
+        return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Forbidden' } })
+      }
+
       const { amount } = req.body
 
       if (!amount || typeof amount !== 'string') {
