@@ -2378,4 +2378,538 @@ export class RealSorobanAdapter implements SorobanAdapter {
       }
     })
   }
+
+  // ── epoch_rewards contract methods ────────────────────────────────────────
+
+  async epochStake(user: string, amount: bigint): Promise<string> {
+    return tracer.startActiveSpan('RealSorobanAdapter.epochStake', async (span) => {
+      span.setAttribute('soroban.user', user)
+      span.setAttribute('soroban.amount', amount.toString())
+
+      if (!this.config.epochRewardsId) {
+        const err = new ConfigurationError('SOROBAN_EPOCH_REWARDS_ID not configured')
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message })
+        span.recordException(err)
+        span.end()
+        throw err
+      }
+
+      try {
+        const txHash = await this.adminSigningService.executeAdminOperation({
+          contractId: this.config.epochRewardsId,
+          operation: 'stake',
+          args: [
+            nativeToScVal(new Address(user)),
+            nativeToScVal(amount, { type: 'i128' }),
+          ],
+          networkPassphrase: this.config.networkPassphrase,
+          adminSecret: this.config.adminSecret!,
+          server: this.server,
+        })
+
+        span.setStatus({ code: SpanStatusCode.OK })
+        return txHash
+      } catch (err) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err instanceof Error ? err.message : String(err) })
+        if (err instanceof Error) span.recordException(err)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to stake ${amount} for ${user}`,
+          this.config.epochRewardsId,
+          'stake',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  async epochUnstake(user: string, amount: bigint): Promise<string> {
+    return tracer.startActiveSpan('RealSorobanAdapter.epochUnstake', async (span) => {
+      span.setAttribute('soroban.user', user)
+      span.setAttribute('soroban.amount', amount.toString())
+
+      if (!this.config.epochRewardsId) {
+        const err = new ConfigurationError('SOROBAN_EPOCH_REWARDS_ID not configured')
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message })
+        span.recordException(err)
+        span.end()
+        throw err
+      }
+
+      try {
+        const txHash = await this.adminSigningService.executeAdminOperation({
+          contractId: this.config.epochRewardsId,
+          operation: 'unstake',
+          args: [
+            nativeToScVal(new Address(user)),
+            nativeToScVal(amount, { type: 'i128' }),
+          ],
+          networkPassphrase: this.config.networkPassphrase,
+          adminSecret: this.config.adminSecret!,
+          server: this.server,
+        })
+
+        span.setStatus({ code: SpanStatusCode.OK })
+        return txHash
+      } catch (err) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err instanceof Error ? err.message : String(err) })
+        if (err instanceof Error) span.recordException(err)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to unstake ${amount} for ${user}`,
+          this.config.epochRewardsId,
+          'unstake',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  async epochClaim(user: string): Promise<bigint> {
+    return tracer.startActiveSpan('RealSorobanAdapter.epochClaim', async (span) => {
+      span.setAttribute('soroban.user', user)
+
+      if (!this.config.epochRewardsId) {
+        const err = new ConfigurationError('SOROBAN_EPOCH_REWARDS_ID not configured')
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message })
+        span.recordException(err)
+        span.end()
+        throw err
+      }
+
+      try {
+        const txHash = await this.adminSigningService.executeAdminOperation({
+          contractId: this.config.epochRewardsId,
+          operation: 'claim',
+          args: [nativeToScVal(new Address(user))],
+          networkPassphrase: this.config.networkPassphrase,
+          adminSecret: this.config.adminSecret!,
+          server: this.server,
+        })
+
+        // The claim function returns the claimed amount, but executeAdminOperation only returns txHash
+        // We need to query the result separately or return the txHash for now
+        // For MVP, return the txHash and let the caller query get_claimable separately
+        span.setStatus({ code: SpanStatusCode.OK })
+        return BigInt(0) // TODO: Parse result from transaction events
+      } catch (err) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err instanceof Error ? err.message : String(err) })
+        if (err instanceof Error) span.recordException(err)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to claim rewards for ${user}`,
+          this.config.epochRewardsId,
+          'claim',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  async epochGetClaimable(user: string): Promise<bigint> {
+    return tracer.startActiveSpan('RealSorobanAdapter.epochGetClaimable', async (span) => {
+      span.setAttribute('soroban.user', user)
+
+      if (!this.config.epochRewardsId) {
+        span.setStatus({ code: SpanStatusCode.OK })
+        return BigInt(0)
+      }
+
+      try {
+        const result = await this.invokeReadOnly(
+          this.config.epochRewardsId,
+          'get_claimable',
+          [nativeToScVal(new Address(user))]
+        )
+
+        const claimable = BigInt(scValToNative(result) as number)
+        span.setAttribute('soroban.claimable', claimable.toString())
+        span.setStatus({ code: SpanStatusCode.OK })
+        return claimable
+      } catch (err) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err instanceof Error ? err.message : String(err) })
+        if (err instanceof Error) span.recordException(err)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to get claimable rewards for ${user}`,
+          this.config.epochRewardsId,
+          'get_claimable',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  async epochGetEpoch(epochNumber: number): Promise<import('./adapter.js').EpochInfo | null> {
+    return tracer.startActiveSpan('RealSorobanAdapter.epochGetEpoch', async (span) => {
+      span.setAttribute('soroban.epoch_number', epochNumber)
+
+      if (!this.config.epochRewardsId) {
+        span.setStatus({ code: SpanStatusCode.OK })
+        return null
+      }
+
+      try {
+        const result = await this.invokeReadOnly(
+          this.config.epochRewardsId,
+          'get_epoch',
+          [nativeToScVal(epochNumber)]
+        )
+
+        if (!result) {
+          span.setStatus({ code: SpanStatusCode.OK })
+          return null
+        }
+
+        const epoch = scValToNative(result) as any
+        const normalized: import('./adapter.js').EpochInfo = {
+          epoch_number: typeof epoch?.epoch_number === 'number' ? epoch.epoch_number : 0,
+          start_ts: typeof epoch?.start_ts === 'number' ? epoch.start_ts : 0,
+          duration_secs: typeof epoch?.duration_secs === 'number' ? epoch.duration_secs : 0,
+          end_ts: typeof epoch?.end_ts === 'number' ? epoch.end_ts : 0,
+          seal_ts: typeof epoch?.seal_ts === 'number' ? epoch.seal_ts : 0,
+          sealed: typeof epoch?.sealed === 'boolean' ? epoch.sealed : false,
+          total_rewards: BigInt(epoch?.total_rewards ?? 0),
+          carried_forward: BigInt(epoch?.carried_forward ?? 0),
+          reward_index_at_seal: BigInt(epoch?.reward_index_at_seal ?? 0),
+          dust: BigInt(epoch?.dust ?? 0),
+          total_claimable_at_seal: BigInt(epoch?.total_claimable_at_seal ?? 0),
+        }
+
+        span.setStatus({ code: SpanStatusCode.OK })
+        return normalized
+      } catch (err) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err instanceof Error ? err.message : String(err) })
+        if (err instanceof Error) span.recordException(err)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to get epoch ${epochNumber}`,
+          this.config.epochRewardsId,
+          'get_epoch',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  async epochGetCurrentEpoch(): Promise<number> {
+    return tracer.startActiveSpan('RealSorobanAdapter.epochGetCurrentEpoch', async (span) => {
+      if (!this.config.epochRewardsId) {
+        span.setStatus({ code: SpanStatusCode.OK })
+        return 1
+      }
+
+      try {
+        const result = await this.invokeReadOnly(
+          this.config.epochRewardsId,
+          'current_epoch',
+          []
+        )
+
+        const epochNumber = scValToNative(result) as number
+        span.setAttribute('soroban.current_epoch', epochNumber)
+        span.setStatus({ code: SpanStatusCode.OK })
+        return epochNumber
+      } catch (err) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err instanceof Error ? err.message : String(err) })
+        if (err instanceof Error) span.recordException(err)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          'Failed to get current epoch',
+          this.config.epochRewardsId,
+          'current_epoch',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  async epochGetTotalStaked(): Promise<bigint> {
+    return tracer.startActiveSpan('RealSorobanAdapter.epochGetTotalStaked', async (span) => {
+      if (!this.config.epochRewardsId) {
+        span.setStatus({ code: SpanStatusCode.OK })
+        return BigInt(0)
+      }
+
+      try {
+        const result = await this.invokeReadOnly(
+          this.config.epochRewardsId,
+          'total_staked',
+          []
+        )
+
+        const total = BigInt(scValToNative(result) as number)
+        span.setAttribute('soroban.total_staked', total.toString())
+        span.setStatus({ code: SpanStatusCode.OK })
+        return total
+      } catch (err) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err instanceof Error ? err.message : String(err) })
+        if (err instanceof Error) span.recordException(err)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          'Failed to get total staked',
+          this.config.epochRewardsId,
+          'total_staked',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  async epochFundRewards(caller: string, amount: bigint): Promise<string> {
+    return tracer.startActiveSpan('RealSorobanAdapter.epochFundRewards', async (span) => {
+      span.setAttribute('soroban.caller', caller)
+      span.setAttribute('soroban.amount', amount.toString())
+
+      if (!this.config.epochRewardsId) {
+        const err = new ConfigurationError('SOROBAN_EPOCH_REWARDS_ID not configured')
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message })
+        span.recordException(err)
+        span.end()
+        throw err
+      }
+
+      try {
+        const txHash = await this.adminSigningService.executeAdminOperation({
+          contractId: this.config.epochRewardsId,
+          operation: 'fund_epoch_rewards',
+          args: [
+            nativeToScVal(new Address(caller)),
+            nativeToScVal(amount, { type: 'i128' }),
+          ],
+          networkPassphrase: this.config.networkPassphrase,
+          adminSecret: this.config.adminSecret!,
+          server: this.server,
+        })
+
+        span.setStatus({ code: SpanStatusCode.OK })
+        return txHash
+      } catch (err) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err instanceof Error ? err.message : String(err) })
+        if (err instanceof Error) span.recordException(err)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to fund epoch rewards with ${amount}`,
+          this.config.epochRewardsId,
+          'fund_epoch_rewards',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  async epochSeal(caller: string, targetEpoch: number, nextEpochDurationSecs: number): Promise<string> {
+    return tracer.startActiveSpan('RealSorobanAdapter.epochSeal', async (span) => {
+      span.setAttribute('soroban.caller', caller)
+      span.setAttribute('soroban.target_epoch', targetEpoch)
+      span.setAttribute('soroban.next_duration_secs', nextEpochDurationSecs)
+
+      if (!this.config.epochRewardsId) {
+        const err = new ConfigurationError('SOROBAN_EPOCH_REWARDS_ID not configured')
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message })
+        span.recordException(err)
+        span.end()
+        throw err
+      }
+
+      try {
+        const txHash = await this.adminSigningService.executeAdminOperation({
+          contractId: this.config.epochRewardsId,
+          operation: 'seal_epoch',
+          args: [
+            nativeToScVal(new Address(caller)),
+            nativeToScVal(targetEpoch),
+            nativeToScVal(nextEpochDurationSecs),
+          ],
+          networkPassphrase: this.config.networkPassphrase,
+          adminSecret: this.config.adminSecret!,
+          server: this.server,
+        })
+
+        span.setStatus({ code: SpanStatusCode.OK })
+        return txHash
+      } catch (err) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err instanceof Error ? err.message : String(err) })
+        if (err instanceof Error) span.recordException(err)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to seal epoch ${targetEpoch}`,
+          this.config.epochRewardsId,
+          'seal_epoch',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  // ── rent_wallet contract ─────────────────────────────────────────────────────
+
+  async rentWalletCredit(account: string, amount: bigint): Promise<string> {
+    if (!this.config.rentWalletId) {
+      throw new ConfigurationError('SOROBAN_RENT_WALLET_ID not configured')
+    }
+    if (!this.config.adminSecret) {
+      throw new ConfigurationError('SOROBAN_ADMIN_SECRET not configured for rent_wallet credit')
+    }
+
+    const contractId = this.config.rentWalletId
+    const adminKeypair = Keypair.fromSecret(this.config.adminSecret)
+    const adminAddress = adminKeypair.publicKey()
+
+    return tracer.startActiveSpan('soroban.rent_wallet_credit', async (span) => {
+      span.setAttributes({
+        'soroban.contract_id': contractId,
+        'soroban.account': account,
+        'soroban.amount': amount.toString(),
+      })
+
+      try {
+        const txHash = await this.adminSigningService.executeAdminOperation({
+          contractId,
+          operation: 'rent_wallet_credit',
+          args: [
+            nativeToScVal(new Address(adminAddress)),
+            nativeToScVal(new Address(account)),
+            nativeToScVal(amount, { type: 'i128' }),
+          ],
+          networkPassphrase: this.config.networkPassphrase,
+          adminSecret: this.config.adminSecret,
+          server: this.server,
+        })
+
+        span.setAttributes({ 'soroban.tx_hash': txHash })
+        logger.info('Rent wallet credit submitted', {
+          account,
+          amount: amount.toString(),
+          txHash,
+        })
+
+        return txHash
+      } catch (err) {
+        span.recordException(err as Error)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to credit rent wallet for ${account}`,
+          contractId,
+          'rent_wallet_credit',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  async rentWalletDebit(account: string, amount: bigint): Promise<string> {
+    if (!this.config.rentWalletId) {
+      throw new ConfigurationError('SOROBAN_RENT_WALLET_ID not configured')
+    }
+    if (!this.config.adminSecret) {
+      throw new ConfigurationError('SOROBAN_ADMIN_SECRET not configured for rent_wallet debit')
+    }
+
+    const contractId = this.config.rentWalletId
+    const adminKeypair = Keypair.fromSecret(this.config.adminSecret)
+    const adminAddress = adminKeypair.publicKey()
+
+    return tracer.startActiveSpan('soroban.rent_wallet_debit', async (span) => {
+      span.setAttributes({
+        'soroban.contract_id': contractId,
+        'soroban.account': account,
+        'soroban.amount': amount.toString(),
+      })
+
+      try {
+        const txHash = await this.adminSigningService.executeAdminOperation({
+          contractId,
+          operation: 'rent_wallet_debit',
+          args: [
+            nativeToScVal(new Address(adminAddress)),
+            nativeToScVal(new Address(account)),
+            nativeToScVal(amount, { type: 'i128' }),
+          ],
+          networkPassphrase: this.config.networkPassphrase,
+          adminSecret: this.config.adminSecret,
+          server: this.server,
+        })
+
+        span.setAttributes({ 'soroban.tx_hash': txHash })
+        logger.info('Rent wallet debit submitted', {
+          account,
+          amount: amount.toString(),
+          txHash,
+        })
+
+        return txHash
+      } catch (err) {
+        span.recordException(err as Error)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to debit rent wallet for ${account}`,
+          contractId,
+          'rent_wallet_debit',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  async rentWalletBalance(account: string): Promise<bigint> {
+    if (!this.config.rentWalletId) {
+      throw new ConfigurationError('SOROBAN_RENT_WALLET_ID not configured')
+    }
+
+    const contractId = this.config.rentWalletId
+
+    return tracer.startActiveSpan('soroban.rent_wallet_balance', async (span) => {
+      span.setAttributes({
+        'soroban.contract_id': contractId,
+        'soroban.account': account,
+      })
+
+      try {
+        const result = await this.invokeReadOnly({
+          contractId,
+          method: 'balance',
+          args: [nativeToScVal(new Address(account))],
+        })
+
+        const balance = scValToNative(result) as bigint
+        span.setAttributes({ 'soroban.balance': balance.toString() })
+
+        return balance
+      } catch (err) {
+        span.recordException(err as Error)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to query rent wallet balance for ${account}`,
+          contractId,
+          'balance',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
 }

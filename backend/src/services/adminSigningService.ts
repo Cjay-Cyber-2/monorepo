@@ -37,6 +37,10 @@ export type AdminOperation =
   | 'claim_delegatee_rewards'
   | 'set_commission'
   | 'claim_commission'
+  | 'fund_epoch_rewards'
+  | 'seal_epoch'
+  | 'rent_wallet_credit'
+  | 'rent_wallet_debit'
 
 /**
  * Parameters for admin operations

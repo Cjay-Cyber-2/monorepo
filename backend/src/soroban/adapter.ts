@@ -207,6 +207,24 @@ export interface AllowlistEntry {
   added_at: number        // Ledger sequence number when entry was added
 }
 
+/**
+ * Epoch info from epoch_rewards contract.
+ * Mirrors the contract's EpochInfo struct.
+ */
+export interface EpochInfo {
+  epoch_number: number
+  start_ts: number
+  duration_secs: number
+  end_ts: number
+  seal_ts: number
+  sealed: boolean
+  total_rewards: bigint
+  carried_forward: bigint
+  reward_index_at_seal: bigint
+  dust: bigint
+  total_claimable_at_seal: bigint
+}
+
 export interface SorobanAdapter {
   getBalance(account: string): Promise<bigint>
   credit(account: string, amount: bigint): Promise<void>
@@ -296,4 +314,20 @@ export interface SorobanAdapter {
   // oracle_price_feeds contract — read-only price queries (issue #1488)
   getOraclePrice?(pair: string): Promise<OraclePriceReading>
   isOraclePriceStale?(pair: string): Promise<boolean>
+
+  // epoch_rewards contract — epoch-based staking rewards
+  epochStake?(user: string, amount: bigint): Promise<string>
+  epochUnstake?(user: string, amount: bigint): Promise<string>
+  epochClaim?(user: string): Promise<bigint>
+  epochGetClaimable?(user: string): Promise<bigint>
+  epochGetEpoch?(epochNumber: number): Promise<EpochInfo | null>
+  epochGetCurrentEpoch?(): Promise<number>
+  epochGetTotalStaked?(): Promise<bigint>
+  epochFundRewards?(caller: string, amount: bigint): Promise<string>
+  epochSeal?(caller: string, targetEpoch: number, nextEpochDurationSecs: number): Promise<string>
+
+  // rent_wallet contract — custodial ledger for tenant rent balances
+  rentWalletCredit?(account: string, amount: bigint): Promise<string>
+  rentWalletDebit?(account: string, amount: bigint): Promise<string>
+  rentWalletBalance?(account: string): Promise<bigint>
 }

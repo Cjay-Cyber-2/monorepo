@@ -103,6 +103,7 @@ import { createAdminUnderwritingRouter } from "./routes/adminUnderwriting.js"
 import { PostgresRewardsDataLayer } from "./services/postgres-rewards-data-layer.js"
 import { createReceiptRepository, createTimelockRepository } from "./indexer/repositoryBootstrap.js"
 import { createLandlordPropertiesRouter } from "./routes/landlordProperties.js";
+import { createEpochRewardsRouter } from "./routes/epochRewards.js";
 import { createLandlordRouter } from "./routes/landlord.js";
 import { createAdminLandlordVerificationRouter, createLandlordVerificationRouter } from "./routes/landlordVerification.js";
 import { authenticateToken } from "./middleware/auth.js";
@@ -824,6 +825,7 @@ export function createApp() {
     app.use("/api/gas-metrics", createGasMetricsRouter());
     app.use("/api", createPropertyPhotosRouter());
     app.use("/api/landlord/properties", createLandlordPropertiesRouter());
+    app.use("/api/epoch-rewards", createEpochRewardsRouter());
     app.use(
       "/api/landlord/partner-applications",
       createPartnerLandlordApplicationsRouter(),

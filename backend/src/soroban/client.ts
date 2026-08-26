@@ -16,6 +16,8 @@ export type SorobanConfig = {
   oraclePriceFeedsId?: string
   transactionReceiptId?: string
   allowlistRegistryId?: string
+  epochRewardsId?: string
+  rentWalletId?: string
   adminSecret?: string
   seed?: string | number
 }
@@ -38,6 +40,8 @@ export function getSorobanConfigFromEnv(env: NodeJS.ProcessEnv): SorobanConfig {
     oraclePriceFeedsId: addresses.oraclePriceFeeds,
     transactionReceiptId: addresses.transactionReceipt,
     allowlistRegistryId: addresses.allowlistRegistry,
+    epochRewardsId: addresses.epochRewards,
+    rentWalletId: addresses.rentWallet,
     adminSecret: env.SOROBAN_ADMIN_SECRET,
     seed: env.SOROBAN_STUB_SEED,
   }
