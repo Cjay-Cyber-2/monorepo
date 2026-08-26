@@ -12,6 +12,8 @@ import { logger } from '../utils/logger.js'
 import { PropertyStatus } from '../models/landlordProperty.js'
 import { PricingValidationError } from '../services/pricingService.js'
 import { syncLandlordPropertyListing } from '../services/landlordPropertyListingSync.js'
+import { PostgresUserRepository } from '../repositories/AuthRepository.js'
+import { createSorobanAdapter, getSorobanConfigFromEnv } from '../soroban/index.js'
 
 const router = Router()
 
@@ -71,6 +73,29 @@ router.post(
     try {
       if (req.user?.role !== 'landlord') {
         throw new AppError(ErrorCode.FORBIDDEN, 403, 'Only landlords can create properties')
+      }
+
+      // Verify on-chain allowlist status for KYC-approved landlords
+      const authRepository = new PostgresUserRepository()
+      const user = await authRepository.getById(req.user.id)
+      if (user?.walletAddress) {
+        const sorobanConfig = getSorobanConfigFromEnv(process.env)
+        const sorobanAdapter = createSorobanAdapter(sorobanConfig)
+        const isAllowlisted = sorobanAdapter.isAllowlisted ? await sorobanAdapter.isAllowlisted(user.walletAddress) : false
+        
+        logger.info('On-chain allowlist check for property creation', {
+          userId: req.user.id,
+          walletAddress: user.walletAddress,
+          isAllowlisted,
+        })
+
+        // Log mismatch but don't block - DB KYC is primary gate
+        if (!isAllowlisted) {
+          logger.warn('DB/chain mismatch: user KYC-approved but not on-chain allowlisted', {
+            userId: req.user.id,
+            walletAddress: user.walletAddress,
+          })
+        }
       }
 
       const input = createPropertySchema.parse(req.body)

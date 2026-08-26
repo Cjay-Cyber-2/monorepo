@@ -197,6 +197,16 @@ export interface OnChainReceipt {
   timestamp: number       // u64
 }
 
+/**
+ * Allowlist entry from allowlist_registry contract.
+ * Mirrors the contract's Entry struct.
+ */
+export interface AllowlistEntry {
+  label: string           // Human-readable label (role, tier, etc.)
+  expires_at: number      // Unix timestamp (seconds) after which entry is expired. 0 means no expiry.
+  added_at: number        // Ledger sequence number when entry was added
+}
+
 export interface SorobanAdapter {
   getBalance(account: string): Promise<bigint>
   credit(account: string, amount: bigint): Promise<void>
@@ -220,6 +230,11 @@ export interface SorobanAdapter {
   getReceiptById?(txId: string): Promise<OnChainReceipt | null>
   listReceiptsByDeal?(dealId: string, limit: number, cursor?: number): Promise<OnChainReceipt[]>
   listReceiptsByUser?(userAddress: string, limit: number, cursor?: number): Promise<OnChainReceipt[]>
+  // Allowlist registry methods
+  addToAllowlist?(address: string, label: string, expiresAt?: number): Promise<string>
+  removeFromAllowlist?(address: string): Promise<string>
+  isAllowlisted?(address: string): Promise<boolean>
+  getAllowlistEntry?(address: string): Promise<AllowlistEntry | null>
   executeTimelock(txHash: string, target: string, functionName: string, args: any[], eta: number): Promise<string>
   cancelTimelock(txHash: string): Promise<string>
 

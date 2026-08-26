@@ -29,6 +29,8 @@ export enum TxType {
   RENT_RELEASE_DISPUTE_RESOLVE = 'rent_release_dispute_resolve',
   RENT_TO_OWN_DEAL_REGISTERED = 'rent_to_own_deal_registered',
   RENT_TO_OWN_EQUITY_PAYMENT = 'rent_to_own_equity_payment',
+  ALLOWLIST_ADD = 'allowlist_add',
+  ALLOWLIST_REMOVE = 'allowlist_remove',
 }
 
 /**
