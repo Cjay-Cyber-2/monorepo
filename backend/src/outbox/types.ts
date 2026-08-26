@@ -31,6 +31,8 @@ export enum TxType {
   RENT_TO_OWN_EQUITY_PAYMENT = 'rent_to_own_equity_payment',
   ALLOWLIST_ADD = 'allowlist_add',
   ALLOWLIST_REMOVE = 'allowlist_remove',
+  RENT_WALLET_CREDIT = 'rent_wallet_credit',
+  RENT_WALLET_DEBIT = 'rent_wallet_debit',
 }
 
 /**

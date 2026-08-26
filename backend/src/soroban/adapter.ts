@@ -325,4 +325,9 @@ export interface SorobanAdapter {
   epochGetTotalStaked?(): Promise<bigint>
   epochFundRewards?(caller: string, amount: bigint): Promise<string>
   epochSeal?(caller: string, targetEpoch: number, nextEpochDurationSecs: number): Promise<string>
+
+  // rent_wallet contract — custodial ledger for tenant rent balances
+  rentWalletCredit?(account: string, amount: bigint): Promise<string>
+  rentWalletDebit?(account: string, amount: bigint): Promise<string>
+  rentWalletBalance?(account: string): Promise<bigint>
 }

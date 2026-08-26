@@ -2759,4 +2759,157 @@ export class RealSorobanAdapter implements SorobanAdapter {
       }
     })
   }
+
+  // ── rent_wallet contract ─────────────────────────────────────────────────────
+
+  async rentWalletCredit(account: string, amount: bigint): Promise<string> {
+    if (!this.config.rentWalletId) {
+      throw new ConfigurationError('SOROBAN_RENT_WALLET_ID not configured')
+    }
+    if (!this.config.adminSecret) {
+      throw new ConfigurationError('SOROBAN_ADMIN_SECRET not configured for rent_wallet credit')
+    }
+
+    const contractId = this.config.rentWalletId
+    const adminKeypair = Keypair.fromSecret(this.config.adminSecret)
+    const adminAddress = adminKeypair.publicKey()
+
+    return tracer.startActiveSpan('soroban.rent_wallet_credit', async (span) => {
+      span.setAttributes({
+        'soroban.contract_id': contractId,
+        'soroban.account': account,
+        'soroban.amount': amount.toString(),
+      })
+
+      try {
+        const txHash = await this.adminSigningService.executeAdminOperation({
+          contractId,
+          operation: 'rent_wallet_credit',
+          args: [
+            nativeToScVal(new Address(adminAddress)),
+            nativeToScVal(new Address(account)),
+            nativeToScVal(amount, { type: 'i128' }),
+          ],
+          networkPassphrase: this.config.networkPassphrase,
+          adminSecret: this.config.adminSecret,
+          server: this.server,
+        })
+
+        span.setAttributes({ 'soroban.tx_hash': txHash })
+        logger.info('Rent wallet credit submitted', {
+          account,
+          amount: amount.toString(),
+          txHash,
+        })
+
+        return txHash
+      } catch (err) {
+        span.recordException(err as Error)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to credit rent wallet for ${account}`,
+          contractId,
+          'rent_wallet_credit',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  async rentWalletDebit(account: string, amount: bigint): Promise<string> {
+    if (!this.config.rentWalletId) {
+      throw new ConfigurationError('SOROBAN_RENT_WALLET_ID not configured')
+    }
+    if (!this.config.adminSecret) {
+      throw new ConfigurationError('SOROBAN_ADMIN_SECRET not configured for rent_wallet debit')
+    }
+
+    const contractId = this.config.rentWalletId
+    const adminKeypair = Keypair.fromSecret(this.config.adminSecret)
+    const adminAddress = adminKeypair.publicKey()
+
+    return tracer.startActiveSpan('soroban.rent_wallet_debit', async (span) => {
+      span.setAttributes({
+        'soroban.contract_id': contractId,
+        'soroban.account': account,
+        'soroban.amount': amount.toString(),
+      })
+
+      try {
+        const txHash = await this.adminSigningService.executeAdminOperation({
+          contractId,
+          operation: 'rent_wallet_debit',
+          args: [
+            nativeToScVal(new Address(adminAddress)),
+            nativeToScVal(new Address(account)),
+            nativeToScVal(amount, { type: 'i128' }),
+          ],
+          networkPassphrase: this.config.networkPassphrase,
+          adminSecret: this.config.adminSecret,
+          server: this.server,
+        })
+
+        span.setAttributes({ 'soroban.tx_hash': txHash })
+        logger.info('Rent wallet debit submitted', {
+          account,
+          amount: amount.toString(),
+          txHash,
+        })
+
+        return txHash
+      } catch (err) {
+        span.recordException(err as Error)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to debit rent wallet for ${account}`,
+          contractId,
+          'rent_wallet_debit',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  async rentWalletBalance(account: string): Promise<bigint> {
+    if (!this.config.rentWalletId) {
+      throw new ConfigurationError('SOROBAN_RENT_WALLET_ID not configured')
+    }
+
+    const contractId = this.config.rentWalletId
+
+    return tracer.startActiveSpan('soroban.rent_wallet_balance', async (span) => {
+      span.setAttributes({
+        'soroban.contract_id': contractId,
+        'soroban.account': account,
+      })
+
+      try {
+        const result = await this.invokeReadOnly({
+          contractId,
+          method: 'balance',
+          args: [nativeToScVal(new Address(account))],
+        })
+
+        const balance = scValToNative(result) as bigint
+        span.setAttributes({ 'soroban.balance': balance.toString() })
+
+        return balance
+      } catch (err) {
+        span.recordException(err as Error)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to query rent wallet balance for ${account}`,
+          contractId,
+          'balance',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
 }

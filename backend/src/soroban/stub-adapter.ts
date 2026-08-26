@@ -582,4 +582,20 @@ async requestRentRelease(params: RequestRentReleaseParams): Promise<void> {
           logger.debug('Soroban stub: epochSeal', { caller, targetEpoch, nextEpochDurationSecs })
           return `stub_epoch_seal_${targetEpoch}`
      }
+
+     // rent_wallet contract methods (stub implementations)
+     async rentWalletCredit(account: string, amount: bigint): Promise<string> {
+          logger.debug('Soroban stub: rentWalletCredit', { account, amount: amount.toString() })
+          return `stub_rent_wallet_credit_${account}_${amount}`
+     }
+
+     async rentWalletDebit(account: string, amount: bigint): Promise<string> {
+          logger.debug('Soroban stub: rentWalletDebit', { account, amount: amount.toString() })
+          return `stub_rent_wallet_debit_${account}_${amount}`
+     }
+
+     async rentWalletBalance(account: string): Promise<bigint> {
+          logger.debug('Soroban stub: rentWalletBalance', { account })
+          return BigInt(0)
+     }
 }
