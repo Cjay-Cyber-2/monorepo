@@ -511,4 +511,29 @@ async requestRentRelease(params: RequestRentReleaseParams): Promise<void> {
           // Return empty array in stub mode
           return []
      }
+
+     // Allowlist registry methods (stub implementations)
+     async addToAllowlist(address: string, label: string, expiresAt?: number): Promise<string> {
+          logger.debug('Soroban stub: addToAllowlist', { address, label, expiresAt })
+          // Return stub transaction hash
+          return `stub_allowlist_add_${address}`
+     }
+
+     async removeFromAllowlist(address: string): Promise<string> {
+          logger.debug('Soroban stub: removeFromAllowlist', { address })
+          // Return stub transaction hash
+          return `stub_allowlist_remove_${address}`
+     }
+
+     async isAllowlisted(address: string): Promise<boolean> {
+          logger.debug('Soroban stub: isAllowlisted', { address })
+          // Return false in stub mode (no actual allowlist)
+          return false
+     }
+
+     async getAllowlistEntry(address: string): Promise<import('./adapter.js').AllowlistEntry | null> {
+          logger.debug('Soroban stub: getAllowlistEntry', { address })
+          // Return null in stub mode
+          return null
+     }
 }

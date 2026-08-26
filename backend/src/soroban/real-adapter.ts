@@ -1008,19 +1008,9 @@ export class RealSorobanAdapter implements SorobanAdapter {
 
   private bytesLikeToHex(v: unknown): string | undefined {
     if (!v) return undefined
-    if (typeof v === 'string') {
-      return v
-    }
-    try {
-      if (v instanceof Uint8Array) return Buffer.from(v).toString('hex')
-      const maybe = v as any
-      if (typeof maybe?.toString === 'function') {
-        const hex = maybe.toString('hex')
-        if (typeof hex === 'string' && hex.length) return hex
-      }
-    } catch {
-      // ignore
-    }
+    if (typeof v === 'string') return v
+    if (Buffer.isBuffer(v)) return v.toString('hex')
+    if (v instanceof Uint8Array) return Buffer.from(v).toString('hex')
     return undefined
   }
 
@@ -2176,6 +2166,212 @@ export class RealSorobanAdapter implements SorobanAdapter {
           this.config.oraclePriceFeedsId,
           'is_stale',
           err,
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  /**
+   * Add an address to the allowlist registry.
+   * Requires admin authentication via admin signing service.
+   */
+  async addToAllowlist(address: string, label: string, expiresAt?: number): Promise<string> {
+    return tracer.startActiveSpan('RealSorobanAdapter.addToAllowlist', async (span) => {
+      span.setAttribute('soroban.address', address)
+      span.setAttribute('soroban.label', label)
+      span.setAttribute('soroban.expires_at', expiresAt ?? 0)
+
+      if (!this.config.allowlistRegistryId) {
+        const err = new ConfigurationError('SOROBAN_ALLOWLIST_REGISTRY_ID not configured for addToAllowlist')
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message })
+        span.recordException(err)
+        span.end()
+        throw err
+      }
+
+      if (!this.config.adminSecret) {
+        const err = new ConfigurationError('SOROBAN_ADMIN_SECRET not configured for addToAllowlist')
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message })
+        span.recordException(err)
+        span.end()
+        throw err
+      }
+
+      try {
+        const args = [
+          nativeToScVal(new Address(address)),
+          nativeToScVal(label),
+          nativeToScVal(expiresAt ?? 0, { type: 'u64' }),
+        ]
+
+        await this.invokeTransaction(
+          this.config.allowlistRegistryId,
+          'add',
+          args,
+        )
+
+        logger.info('Address added to allowlist', { address, label, expiresAt })
+        span.setStatus({ code: SpanStatusCode.OK })
+        return `allowlist_add_${address}`
+      } catch (err) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err instanceof Error ? err.message : String(err) })
+        if (err instanceof Error) span.recordException(err)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to add address ${address} to allowlist`,
+          this.config.allowlistRegistryId,
+          'add',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  /**
+   * Remove an address from the allowlist registry.
+   * Requires admin authentication via admin signing service.
+   */
+  async removeFromAllowlist(address: string): Promise<string> {
+    return tracer.startActiveSpan('RealSorobanAdapter.removeFromAllowlist', async (span) => {
+      span.setAttribute('soroban.address', address)
+
+      if (!this.config.allowlistRegistryId) {
+        const err = new ConfigurationError('SOROBAN_ALLOWLIST_REGISTRY_ID not configured for removeFromAllowlist')
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message })
+        span.recordException(err)
+        span.end()
+        throw err
+      }
+
+      if (!this.config.adminSecret) {
+        const err = new ConfigurationError('SOROBAN_ADMIN_SECRET not configured for removeFromAllowlist')
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message })
+        span.recordException(err)
+        span.end()
+        throw err
+      }
+
+      try {
+        const args = [nativeToScVal(new Address(address))]
+
+        await this.invokeTransaction(
+          this.config.allowlistRegistryId,
+          'remove',
+          args,
+        )
+
+        logger.info('Address removed from allowlist', { address })
+        span.setStatus({ code: SpanStatusCode.OK })
+        return `allowlist_remove_${address}`
+      } catch (err) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err instanceof Error ? err.message : String(err) })
+        if (err instanceof Error) span.recordException(err)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to remove address ${address} from allowlist`,
+          this.config.allowlistRegistryId,
+          'remove',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  /**
+   * Check if an address is on the allowlist.
+   * Read-only query, no authentication required.
+   */
+  async isAllowlisted(address: string): Promise<boolean> {
+    return tracer.startActiveSpan('RealSorobanAdapter.isAllowlisted', async (span) => {
+      span.setAttribute('soroban.address', address)
+
+      if (!this.config.allowlistRegistryId) {
+        span.setStatus({ code: SpanStatusCode.OK })
+        return false // Not configured means no allowlist check
+      }
+
+      try {
+        const result = await this.invokeReadOnly(
+          this.config.allowlistRegistryId,
+          'is_member',
+          [nativeToScVal(new Address(address))]
+        )
+
+        const isMember = scValToNative(result) as boolean
+        span.setAttribute('soroban.is_member', isMember)
+        span.setStatus({ code: SpanStatusCode.OK })
+        return isMember
+      } catch (err) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err instanceof Error ? err.message : String(err) })
+        if (err instanceof Error) span.recordException(err)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to check allowlist status for ${address}`,
+          this.config.allowlistRegistryId,
+          'is_member',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  /**
+   * Get the allowlist entry for an address.
+   * Read-only query, no authentication required.
+   */
+  async getAllowlistEntry(address: string): Promise<import('./adapter.js').AllowlistEntry | null> {
+    return tracer.startActiveSpan('RealSorobanAdapter.getAllowlistEntry', async (span) => {
+      span.setAttribute('soroban.address', address)
+
+      if (!this.config.allowlistRegistryId) {
+        span.setStatus({ code: SpanStatusCode.OK })
+        return null
+      }
+
+      try {
+        const result = await this.invokeReadOnly(
+          this.config.allowlistRegistryId,
+          'get_entry',
+          [nativeToScVal(new Address(address))]
+        )
+
+        if (!result) {
+          span.setStatus({ code: SpanStatusCode.OK })
+          return null
+        }
+
+        const entry = scValToNative(result) as any
+        const normalized: import('./adapter.js').AllowlistEntry = {
+          label: typeof entry?.label === 'string' ? entry.label : '',
+          expires_at: typeof entry?.expires_at === 'number' ? entry.expires_at : 0,
+          added_at: typeof entry?.added_at === 'number' ? entry.added_at : 0,
+        }
+
+        span.setStatus({ code: SpanStatusCode.OK })
+        return normalized
+      } catch (err) {
+        // EntryNotFound is expected if address is not on allowlist
+        if (err instanceof ContractError && err.message.includes('EntryNotFound')) {
+          span.setStatus({ code: SpanStatusCode.OK })
+          return null
+        }
+
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err instanceof Error ? err.message : String(err) })
+        if (err instanceof Error) span.recordException(err)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to get allowlist entry for ${address}`,
+          this.config.allowlistRegistryId,
+          'get_entry',
+          err
         )
       } finally {
         span.end()
