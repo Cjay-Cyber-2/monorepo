@@ -450,6 +450,9 @@ export class RealSorobanAdapter implements SorobanAdapter {
    * and treat as success (idempotent behavior).
    * 
    * This ensures duplicate calls don't break confirm/finalize flows.
+   * 
+   * Migration: If SOROBAN_TRANSACTION_RECEIPT_ID is configured, uses the dedicated transaction-receipt-contract.
+   * Otherwise, falls back to the legacy core contract for backward compatibility.
    */
   async recordReceipt(params: RecordReceiptParams, hooks?: TxBroadcastHooks): Promise<void> {
     return tracer.startActiveSpan('RealSorobanAdapter.recordReceipt', async (span) => {
@@ -457,8 +460,17 @@ export class RealSorobanAdapter implements SorobanAdapter {
       span.setAttribute('soroban.deal_id', params.dealId)
       span.setAttribute('soroban.tx_type', params.txType)
 
-      if (!this.config.contractId) {
-        throw new ConfigurationError('SOROBAN_CONTRACT_ID not configured for recordReceipt')
+      // Determine which contract to use
+      const useTransactionReceiptContract = !!this.config.transactionReceiptId
+      const contractId = useTransactionReceiptContract
+        ? this.config.transactionReceiptId!
+        : this.config.contractId
+
+      if (!contractId) {
+        const contractName = useTransactionReceiptContract
+          ? 'SOROBAN_TRANSACTION_RECEIPT_ID'
+          : 'SOROBAN_CONTRACT_ID'
+        throw new ConfigurationError(`${contractName} not configured for recordReceipt`)
       }
 
       if (!this.config.adminSecret) {
@@ -470,11 +482,13 @@ export class RealSorobanAdapter implements SorobanAdapter {
         const txIdBytes = Buffer.from(params.txId, 'hex')
 
         // Build the receipt parameters for the contract call
-        const receiptArgs = this.buildReceiptArgs(params, txIdBytes)
+        const receiptArgs = useTransactionReceiptContract
+          ? this.buildReceiptArgs(params, txIdBytes)
+          : this.buildLegacyReceiptArgs(params, txIdBytes)
 
         // Submit the transaction (onTxBuilt fires before broadcast for durable intent)
         await this.invokeTransaction(
-          this.config.contractId,
+          contractId,
           'record_receipt',
           receiptArgs,
           hooks,
@@ -485,6 +499,7 @@ export class RealSorobanAdapter implements SorobanAdapter {
           txType: params.txType,
           dealId: params.dealId,
           amountUsdc: params.amountUsdc,
+          contractType: useTransactionReceiptContract ? 'transaction-receipt-contract' : 'legacy-core',
         })
         span.setStatus({ code: SpanStatusCode.OK })
       } catch (err) {
@@ -530,18 +545,24 @@ export class RealSorobanAdapter implements SorobanAdapter {
   }
 
   /**
-   * Build receipt arguments for the contract call.
-   * Maps TypeScript params to Soroban SCVal types.
+   * Build receipt arguments for the transaction-receipt-contract call.
+   * Maps TypeScript params to Soroban SCVal types matching ReceiptInput struct.
    */
   private buildReceiptArgs(params: RecordReceiptParams, txIdBytes: Buffer): xdr.ScVal[] {
-    // Build the receipt struct/map for the contract
+    // Build the ReceiptInput struct/map for the transaction-receipt-contract
     const receiptMap = new Map<string, xdr.ScVal>()
 
-    // Required fields
-    receiptMap.set('tx_id', this.bytesToScVal(txIdBytes))
+    // Required fields for transaction-receipt-contract
+    // The contract generates tx_id internally from external_ref_source and external_ref
+    if (params.externalRefSource) {
+      receiptMap.set('external_ref_source', nativeToScVal(params.externalRefSource))
+    }
+    if (params.externalRef) {
+      receiptMap.set('external_ref', nativeToScVal(params.externalRef))
+    }
     receiptMap.set('tx_type', nativeToScVal(params.txType))
     receiptMap.set('amount_usdc', this.decimalToI128(params.amountUsdc))
-    receiptMap.set('token_address', nativeToScVal(new Address(params.tokenAddress)))
+    receiptMap.set('token', nativeToScVal(new Address(params.tokenAddress)))
     receiptMap.set('deal_id', nativeToScVal(params.dealId))
 
     // Optional fields - only include if present
@@ -574,6 +595,48 @@ export class RealSorobanAdapter implements SorobanAdapter {
   }
 
   /**
+   * Build receipt arguments for the legacy core contract call.
+   * Used during migration when transactionReceiptId is not configured.
+   */
+  private buildLegacyReceiptArgs(params: RecordReceiptParams, txIdBytes: Buffer): xdr.ScVal[] {
+    // Build the receipt struct/map for the legacy core contract
+    const receiptMap = new Map<string, xdr.ScVal>()
+
+    // Required fields for legacy contract
+    receiptMap.set('tx_id', this.bytesToScVal(txIdBytes))
+    receiptMap.set('tx_type', nativeToScVal(params.txType))
+    receiptMap.set('amount_usdc', this.decimalToI128(params.amountUsdc))
+    receiptMap.set('token_address', nativeToScVal(new Address(params.tokenAddress)))
+    receiptMap.set('deal_id', nativeToScVal(params.dealId))
+
+    // Optional fields - only include if present
+    if (params.listingId) {
+      receiptMap.set('listing_id', nativeToScVal(params.listingId))
+    }
+    if (params.from) {
+      receiptMap.set('from', nativeToScVal(new Address(params.from)))
+    }
+    if (params.to) {
+      receiptMap.set('to', nativeToScVal(new Address(params.to)))
+    }
+    if (params.amountNgn !== undefined) {
+      receiptMap.set('amount_ngn', nativeToScVal(params.amountNgn, { type: 'i128' }))
+    }
+    if (params.fxRate !== undefined) {
+      const fxRateScaled = Math.round(params.fxRate * 1_000_000)
+      receiptMap.set('fx_rate_ngn_per_usdc', nativeToScVal(fxRateScaled, { type: 'i128' }))
+    }
+    if (params.fxProvider) {
+      receiptMap.set('fx_provider', nativeToScVal(params.fxProvider))
+    }
+    if (params.metadataHash) {
+      receiptMap.set('metadata_hash', this.bytesToScVal(Buffer.from(params.metadataHash, 'hex')))
+    }
+
+    return [nativeToScVal(receiptMap, { type: 'map' })]
+  }
+
+  /**
    * Convert bytes to ScVal
    */
   private bytesToScVal(bytes: Buffer): xdr.ScVal {
@@ -600,9 +663,17 @@ export class RealSorobanAdapter implements SorobanAdapter {
   async getReceiptEvents(fromLedger: number | null): Promise<RawReceiptEvent[]> {
     return tracer.startActiveSpan('RealSorobanAdapter.getReceiptEvents', async (span) => {
       span.setAttribute('soroban.from_ledger', fromLedger ?? 'latest')
-      
-      if (!this.config.contractId) {
-        const err = new ConfigurationError('SOROBAN_CONTRACT_ID not configured for getReceiptEvents')
+
+      // Determine which contract(s) to query
+      const useTransactionReceiptContract = !!this.config.transactionReceiptId
+      const contractIds = useTransactionReceiptContract
+        ? [this.config.transactionReceiptId!]
+        : this.config.contractId
+          ? [this.config.contractId]
+          : []
+
+      if (contractIds.length === 0) {
+        const err = new ConfigurationError('Neither SOROBAN_TRANSACTION_RECEIPT_ID nor SOROBAN_CONTRACT_ID configured for getReceiptEvents')
         span.setStatus({ code: SpanStatusCode.ERROR, message: err.message })
         span.recordException(err)
         span.end()
@@ -636,7 +707,7 @@ export class RealSorobanAdapter implements SorobanAdapter {
               filters: [
                 {
                   type: 'contract',
-                  contractIds: [this.config.contractId],
+                  contractIds,
                   topics: [[topic0, topic1, '*']],
                 },
               ],
@@ -647,7 +718,7 @@ export class RealSorobanAdapter implements SorobanAdapter {
               filters: [
                 {
                   type: 'contract',
-                  contractIds: [this.config.contractId],
+                  contractIds,
                   topics: [[topic0, topic1, '*']],
                 },
               ],
@@ -672,7 +743,7 @@ export class RealSorobanAdapter implements SorobanAdapter {
                 : typeof evAny.contractId?.toString === 'function'
                   ? evAny.contractId.toString()
                   : undefined
-            if (!contractId || contractId !== this.config.contractId) continue
+            if (!contractId || !contractIds.includes(contractId)) continue
 
             if (typeof evAny.value !== 'string') continue
             if (typeof evAny.txHash !== 'string') continue
@@ -709,6 +780,187 @@ export class RealSorobanAdapter implements SorobanAdapter {
         span.end()
       }
     })
+  }
+
+  /**
+   * Get a receipt by transaction ID from the transaction-receipt-contract.
+   * Direct query method for reliable on-chain receipt lookup.
+   */
+  async getReceiptById(txId: string): Promise<import('./adapter.js').OnChainReceipt | null> {
+    return tracer.startActiveSpan('RealSorobanAdapter.getReceiptById', async (span) => {
+      span.setAttribute('soroban.tx_id', txId)
+
+      if (!this.config.transactionReceiptId) {
+        const err = new ConfigurationError('SOROBAN_TRANSACTION_RECEIPT_ID not configured for getReceiptById')
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message })
+        span.recordException(err)
+        span.end()
+        throw err
+      }
+
+      try {
+        const txIdBytes = Buffer.from(txId, 'hex')
+        const result = await this.invokeReadOnly(
+          this.config.transactionReceiptId,
+          'get_receipt',
+          [nativeToScVal(txIdBytes)]
+        )
+
+        if (!result) {
+          span.setStatus({ code: SpanStatusCode.OK })
+          return null
+        }
+
+        const receipt = this.normalizeOnChainReceipt(scValToNative(result))
+        span.setStatus({ code: SpanStatusCode.OK })
+        return receipt
+      } catch (err: any) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message || String(err) })
+        if (err instanceof Error) span.recordException(err)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to get receipt by ID ${txId}`,
+          this.config.transactionReceiptId,
+          'get_receipt',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  /**
+   * List receipts for a specific deal from the transaction-receipt-contract.
+   * Direct query method with pagination support.
+   */
+  async listReceiptsByDeal(
+    dealId: string,
+    limit: number,
+    cursor?: number
+  ): Promise<import('./adapter.js').OnChainReceipt[]> {
+    return tracer.startActiveSpan('RealSorobanAdapter.listReceiptsByDeal', async (span) => {
+      span.setAttribute('soroban.deal_id', dealId)
+      span.setAttribute('soroban.limit', limit)
+      span.setAttribute('soroban.cursor', cursor ?? 0)
+
+      if (!this.config.transactionReceiptId) {
+        const err = new ConfigurationError('SOROBAN_TRANSACTION_RECEIPT_ID not configured for listReceiptsByDeal')
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message })
+        span.recordException(err)
+        span.end()
+        throw err
+      }
+
+      try {
+        const result = await this.invokeReadOnly(
+          this.config.transactionReceiptId,
+          'list_receipts_by_deal',
+          [
+            nativeToScVal(dealId),
+            nativeToScVal(limit, { type: 'u32' }),
+            cursor !== undefined ? nativeToScVal(cursor, { type: 'u32' }) : nativeToScVal(null),
+          ]
+        )
+
+        const receiptsVec = scValToNative(result) as any[]
+        const receipts = receiptsVec.map(r => this.normalizeOnChainReceipt(r))
+
+        span.setAttribute('soroban.receipts_count', receipts.length)
+        span.setStatus({ code: SpanStatusCode.OK })
+        return receipts
+      } catch (err: any) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message || String(err) })
+        if (err instanceof Error) span.recordException(err)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to list receipts for deal ${dealId}`,
+          this.config.transactionReceiptId,
+          'list_receipts_by_deal',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  /**
+   * List receipts for a specific user from the transaction-receipt-contract.
+   * Direct query method with pagination support.
+   */
+  async listReceiptsByUser(
+    userAddress: string,
+    limit: number,
+    cursor?: number
+  ): Promise<import('./adapter.js').OnChainReceipt[]> {
+    return tracer.startActiveSpan('RealSorobanAdapter.listReceiptsByUser', async (span) => {
+      span.setAttribute('soroban.user_address', userAddress)
+      span.setAttribute('soroban.limit', limit)
+      span.setAttribute('soroban.cursor', cursor ?? 0)
+
+      if (!this.config.transactionReceiptId) {
+        const err = new ConfigurationError('SOROBAN_TRANSACTION_RECEIPT_ID not configured for listReceiptsByUser')
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message })
+        span.recordException(err)
+        span.end()
+        throw err
+      }
+
+      try {
+        const result = await this.invokeReadOnly(
+          this.config.transactionReceiptId,
+          'list_receipts_by_user',
+          [
+            nativeToScVal(new Address(userAddress)),
+            nativeToScVal(limit, { type: 'u32' }),
+            cursor !== undefined ? nativeToScVal(cursor, { type: 'u32' }) : nativeToScVal(null),
+          ]
+        )
+
+        const receiptsVec = scValToNative(result) as any[]
+        const receipts = receiptsVec.map(r => this.normalizeOnChainReceipt(r))
+
+        span.setAttribute('soroban.receipts_count', receipts.length)
+        span.setStatus({ code: SpanStatusCode.OK })
+        return receipts
+      } catch (err: any) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: err.message || String(err) })
+        if (err instanceof Error) span.recordException(err)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to list receipts for user ${userAddress}`,
+          this.config.transactionReceiptId,
+          'list_receipts_by_user',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  /**
+   * Normalize on-chain receipt to TypeScript interface.
+   * Converts Soroban types to plain JavaScript types.
+   */
+  private normalizeOnChainReceipt(receipt: any): import('./adapter.js').OnChainReceipt {
+    return {
+      tx_id: this.bytesLikeToHex(receipt?.tx_id) ?? '',
+      tx_type: typeof receipt?.tx_type === 'string' ? receipt.tx_type : '',
+      amount_usdc: this.i128ToDecimalString(receipt?.amount_usdc),
+      token: String(receipt?.token ?? ''),
+      deal_id: typeof receipt?.deal_id === 'string' ? receipt.deal_id : '',
+      listing_id: typeof receipt?.listing_id === 'string' ? receipt.listing_id : undefined,
+      from: receipt?.from ? String(receipt.from) : undefined,
+      to: receipt?.to ? String(receipt.to) : undefined,
+      external_ref: this.bytesLikeToHex(receipt?.external_ref) ?? '',
+      amount_ngn: this.i128ToDecimalString(receipt?.amount_ngn),
+      fx_rate_ngn_per_usdc: this.i128ToDecimalString(receipt?.fx_rate_ngn_per_usdc),
+      fx_provider: typeof receipt?.fx_provider === 'string' ? receipt.fx_provider : undefined,
+      metadata_hash: this.bytesLikeToHex(receipt?.metadata_hash),
+      timestamp: typeof receipt?.timestamp === 'number' ? receipt.timestamp : 0,
+    }
   }
 
   private scValTopicBase64(v: xdr.ScVal): string {

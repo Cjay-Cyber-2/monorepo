@@ -15,6 +15,9 @@ export interface RecordReceiptParams {
   fxRate?: number
   fxProvider?: string
   metadataHash?: string
+  // New fields for transaction-receipt-contract
+  externalRefSource?: string  // e.g., "paystack", "stellar", "manual"
+  externalRef?: string        // External payment reference string
 }
 
 export type DealSyncStatus = 'active' | 'completed' | 'defaulted'
@@ -173,6 +176,27 @@ export interface DelegateeEarnings {
   commissionClaimable: bigint
 }
 
+/**
+ * On-chain receipt from transaction-receipt-contract.
+ * Mirrors the contract's Receipt struct.
+ */
+export interface OnChainReceipt {
+  tx_id: string           // BytesN<32> as hex string
+  tx_type: string         // Symbol
+  amount_usdc: string     // i128 as decimal string
+  token: string           // Address
+  deal_id: string
+  listing_id?: string
+  from?: string
+  to?: string
+  external_ref: string    // BytesN<32> as hex string
+  amount_ngn?: string     // i128 as decimal string
+  fx_rate_ngn_per_usdc?: string  // i128 as decimal string
+  fx_provider?: string
+  metadata_hash?: string  // BytesN<32> as hex string
+  timestamp: number       // u64
+}
+
 export interface SorobanAdapter {
   getBalance(account: string): Promise<bigint>
   credit(account: string, amount: bigint): Promise<void>
@@ -192,6 +216,10 @@ export interface SorobanAdapter {
   getConfig(): SorobanConfig
   getReceiptEvents(fromLedger: number | null): Promise<RawReceiptEvent[]>
   getTimelockEvents(fromLedger: number | null): Promise<any[]>
+  // Direct query methods for transaction-receipt-contract
+  getReceiptById?(txId: string): Promise<OnChainReceipt | null>
+  listReceiptsByDeal?(dealId: string, limit: number, cursor?: number): Promise<OnChainReceipt[]>
+  listReceiptsByUser?(userAddress: string, limit: number, cursor?: number): Promise<OnChainReceipt[]>
   executeTimelock(txHash: string, target: string, functionName: string, args: any[], eta: number): Promise<string>
   cancelTimelock(txHash: string): Promise<string>
 

@@ -437,6 +437,63 @@ describe('RealSorobanAdapter', () => {
       expect(args.length).toBe(1)
     })
 
+    it('should use transactionReceiptId when configured for recordReceipt', async () => {
+      const configWithTransactionReceipt = {
+        ...mockConfig,
+        transactionReceiptId: 'CTRX...',
+        contractId: mockConfig.contractId,
+      }
+      const adapterWithTransactionReceipt = new RealSorobanAdapter(configWithTransactionReceipt)
+
+      const invokeSpy = vi
+        .spyOn(adapterWithTransactionReceipt as any, 'invokeTransaction')
+        .mockResolvedValue(undefined)
+
+      await adapterWithTransactionReceipt.recordReceipt({
+        txId: 'abc123def456',
+        txType: TxType.TENANT_REPAYMENT,
+        amountUsdc: '100.00',
+        tokenAddress: 'CDUSDC...',
+        dealId: 'deal-123',
+        externalRefSource: 'paystack',
+        externalRef: 'ref-123',
+      })
+
+      expect(invokeSpy).toHaveBeenCalledTimes(1)
+      const [contractId, method, args] = invokeSpy.mock.calls[0]
+      expect(contractId).toBe(configWithTransactionReceipt.transactionReceiptId)
+      expect(method).toBe('record_receipt')
+      expect(Array.isArray(args)).toBe(true)
+      expect(args.length).toBe(1)
+    })
+
+    it('should fall back to contractId when transactionReceiptId is not configured', async () => {
+      const configWithoutTransactionReceipt = {
+        ...mockConfig,
+        transactionReceiptId: undefined,
+      }
+      const adapterWithoutTransactionReceipt = new RealSorobanAdapter(configWithoutTransactionReceipt)
+
+      const invokeSpy = vi
+        .spyOn(adapterWithoutTransactionReceipt as any, 'invokeTransaction')
+        .mockResolvedValue(undefined)
+
+      await adapterWithoutTransactionReceipt.recordReceipt({
+        txId: 'abc123def456',
+        txType: TxType.TENANT_REPAYMENT,
+        amountUsdc: '100.00',
+        tokenAddress: 'CDUSDC...',
+        dealId: 'deal-123',
+      })
+
+      expect(invokeSpy).toHaveBeenCalledTimes(1)
+      const [contractId, method, args] = invokeSpy.mock.calls[0]
+      expect(contractId).toBe(configWithoutTransactionReceipt.contractId)
+      expect(method).toBe('record_receipt')
+      expect(Array.isArray(args)).toBe(true)
+      expect(args.length).toBe(1)
+    })
+
     it('should treat duplicate receipt errors as idempotent success', async () => {
       vi.spyOn(adapter as any, 'invokeTransaction').mockRejectedValue(
         new Error('Receipt already exists for tx_id abc123')
