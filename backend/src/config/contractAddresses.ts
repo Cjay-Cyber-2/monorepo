@@ -18,6 +18,7 @@ export const CONTRACT_ENV_VARS = {
   oraclePriceFeeds: 'SOROBAN_ORACLE_PRICE_FEEDS_ID',
   transactionReceipt: 'SOROBAN_TRANSACTION_RECEIPT_ID',
   allowlistRegistry: 'SOROBAN_ALLOWLIST_REGISTRY_ID',
+  epochRewards: 'SOROBAN_EPOCH_REWARDS_ID',
 } as const
 
 export type ContractName = keyof typeof CONTRACT_ENV_VARS

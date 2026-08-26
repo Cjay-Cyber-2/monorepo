@@ -600,6 +600,256 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /api/epoch-rewards/stake:
+    post:
+      summary: Stake tokens in epoch rewards contract
+      description: Stake tokens to participate in epoch rewards program.
+      operationId: epochStake
+      tags:
+        - Epoch Rewards
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount:
+                  type: string
+                  description: Amount to stake as string (to handle large numbers)
+                  example: "1000000"
+      responses:
+        "200":
+          description: Stake submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, txHash]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  txHash:
+                    type: string
+                    description: Stellar transaction hash
+                    example: "a3f2c1d4e5b6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/epoch-rewards/unstake:
+    post:
+      summary: Unstake tokens from epoch rewards contract
+      description: Unstake previously staked tokens from epoch rewards program.
+      operationId: epochUnstake
+      tags:
+        - Epoch Rewards
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount:
+                  type: string
+                  description: Amount to unstake as string
+                  example: "500000"
+      responses:
+        "200":
+          description: Unstake submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, txHash]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  txHash:
+                    type: string
+                    description: Stellar transaction hash
+                    example: "b4f3d2e5f6a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/epoch-rewards/claim:
+    post:
+      summary: Claim epoch rewards
+      description: Claim available rewards from the epoch rewards contract.
+      operationId: epochClaim
+      tags:
+        - Epoch Rewards
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Rewards claimed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, claimedAmount]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  claimedAmount:
+                    type: string
+                    description: Amount claimed as string
+                    example: "1000"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/epoch-rewards/claimable:
+    get:
+      summary: Get claimable rewards amount
+      description: Query the amount of rewards available to claim for the authenticated user.
+      operationId: epochGetClaimable
+      tags:
+        - Epoch Rewards
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Claimable amount retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, claimable]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  claimable:
+                    type: string
+                    description: Amount available to claim as string
+                    example: "500"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/epoch-rewards/epoch/{epochNumber}:
+    get:
+      summary: Get epoch information
+      description: Retrieve detailed information about a specific epoch.
+      operationId: epochGetEpoch
+      tags:
+        - Epoch Rewards
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: epochNumber
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: The epoch number to query
+      responses:
+        "200":
+          description: Epoch information retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/EpochInfo"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/epoch-rewards/current-epoch:
+    get:
+      summary: Get current epoch number
+      description: Retrieve the current epoch number from the epoch rewards contract.
+      operationId: epochGetCurrentEpoch
+      tags:
+        - Epoch Rewards
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current epoch number retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, currentEpoch]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  currentEpoch:
+                    type: integer
+                    description: Current epoch number
+                    example: 1
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/epoch-rewards/total-staked:
+    get:
+      summary: Get total staked amount
+      description: Retrieve the total amount of tokens staked in the epoch rewards contract.
+      operationId: epochGetTotalStaked
+      tags:
+        - Epoch Rewards
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Total staked amount retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, totalStaked]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  totalStaked:
+                    type: string
+                    description: Total staked amount as string
+                    example: "1000000"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/Error"
+
   /api/property-issue-reports:
     post:
       summary: Submit a property issue report
@@ -3947,6 +4197,67 @@ components:
           type: string
           description: Optional FX rate provider
           example: coinbase
+
+    EpochInfo:
+      type: object
+      description: Information about a specific epoch in the epoch rewards contract
+      required:
+        - epoch_number
+        - start_ts
+        - duration_secs
+        - end_ts
+        - seal_ts
+        - sealed
+        - total_rewards
+        - carried_forward
+        - reward_index_at_seal
+        - dust
+        - total_claimable_at_seal
+      properties:
+        epoch_number:
+          type: integer
+          description: The epoch number
+          example: 1
+        start_ts:
+          type: integer
+          description: Unix timestamp when the epoch started
+          example: 1000
+        duration_secs:
+          type: integer
+          description: Duration of the epoch in seconds
+          example: 86400
+        end_ts:
+          type: integer
+          description: Unix timestamp when the epoch ends
+          example: 87400
+        seal_ts:
+          type: integer
+          description: Unix timestamp when the epoch was sealed
+          example: 87400
+        sealed:
+          type: boolean
+          description: Whether the epoch has been sealed
+          example: true
+        total_rewards:
+          type: string
+          description: Total rewards added to the epoch as string
+          example: "10000"
+        carried_forward:
+          type: string
+          description: Amount carried forward from previous epoch as string
+          example: "0"
+        reward_index_at_seal:
+          type: string
+          description: Reward index at the time of sealing as string
+          example: "1000"
+        dust:
+          type: string
+          description: Dust amount as string
+          example: "0"
+        total_claimable_at_seal:
+          type: string
+          description: Total claimable amount at seal as string
+          example: "5000"
     EarningsResponse:
       type: object
       required:

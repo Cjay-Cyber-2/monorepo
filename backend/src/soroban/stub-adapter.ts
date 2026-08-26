@@ -536,4 +536,50 @@ async requestRentRelease(params: RequestRentReleaseParams): Promise<void> {
           // Return null in stub mode
           return null
      }
+
+     // epoch_rewards contract methods (stub implementations)
+     async epochStake(user: string, amount: bigint): Promise<string> {
+          logger.debug('Soroban stub: epochStake', { user, amount: amount.toString() })
+          return `stub_epoch_stake_${user}_${amount}`
+     }
+
+     async epochUnstake(user: string, amount: bigint): Promise<string> {
+          logger.debug('Soroban stub: epochUnstake', { user, amount: amount.toString() })
+          return `stub_epoch_unstake_${user}_${amount}`
+     }
+
+     async epochClaim(user: string): Promise<bigint> {
+          logger.debug('Soroban stub: epochClaim', { user })
+          return BigInt(0)
+     }
+
+     async epochGetClaimable(user: string): Promise<bigint> {
+          logger.debug('Soroban stub: epochGetClaimable', { user })
+          return BigInt(0)
+     }
+
+     async epochGetEpoch(epochNumber: number): Promise<import('./adapter.js').EpochInfo | null> {
+          logger.debug('Soroban stub: epochGetEpoch', { epochNumber })
+          return null
+     }
+
+     async epochGetCurrentEpoch(): Promise<number> {
+          logger.debug('Soroban stub: epochGetCurrentEpoch')
+          return 1
+     }
+
+     async epochGetTotalStaked(): Promise<bigint> {
+          logger.debug('Soroban stub: epochGetTotalStaked')
+          return BigInt(0)
+     }
+
+     async epochFundRewards(caller: string, amount: bigint): Promise<string> {
+          logger.debug('Soroban stub: epochFundRewards', { caller, amount: amount.toString() })
+          return `stub_epoch_fund_${caller}_${amount}`
+     }
+
+     async epochSeal(caller: string, targetEpoch: number, nextEpochDurationSecs: number): Promise<string> {
+          logger.debug('Soroban stub: epochSeal', { caller, targetEpoch, nextEpochDurationSecs })
+          return `stub_epoch_seal_${targetEpoch}`
+     }
 }
