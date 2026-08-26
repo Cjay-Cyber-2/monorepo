@@ -9,7 +9,7 @@ import { requestIdMiddleware } from '../middleware/requestId.js'
 
 // Mock auth middleware
 vi.mock('../middleware/auth.js', () => ({
-  authenticateToken: (req: any, res: any, next: any) => {
+  authenticateToken: vi.fn((req: any, res: any, next: any) => {
     // For testing, set a mock user if not already set
     if (!req.user) {
       req.user = {
@@ -20,7 +20,7 @@ vi.mock('../middleware/auth.js', () => ({
       }
     }
     next()
-  },
+  }),
   requirePermission: (resource: string, action: string) => (req: any, res: any, next: any) => {
     // For testing, allow all permissions
     next()
