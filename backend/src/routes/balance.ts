@@ -1,17 +1,40 @@
-import { Router, type NextFunction, type Request, type Response } from 'express'
+import { Router, type NextFunction, type Response } from 'express'
+import { z } from 'zod'
 import { SorobanAdapter } from '../soroban/adapter.js'
+import { authenticateToken, type AuthenticatedRequest } from '../middleware/auth.js'
+import { requirePermission } from '../middleware/rbac.js'
+import { validate } from '../middleware/validate.js'
+import { AppError } from '../errors/AppError.js'
+import { ErrorCode } from '../errors/errorCodes.js'
+
+const amountSchema = z.object({
+  amount: z.string().min(1, 'Amount is required'),
+})
+
+function canAccessAccount(req: AuthenticatedRequest, account: string): boolean {
+  // Admins can access any account
+  if (req.user?.role === 'admin') {
+    return true
+  }
+  // Users can only access their own account (using userId as account identifier)
+  // For Stellar addresses, we'd need to map userId to walletAddress in the future
+  return req.user?.id === account
+}
 
 export function createBalanceRouter(adapter: SorobanAdapter) {
      const router = Router()
 
-     router.get('/balance/:account', async (req: Request, res: Response, next: NextFunction) => {
+     router.get('/balance/:account', authenticateToken, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
           try {
                const { account } = req.params
 
                if (!account || account.trim() === '') {
-                    return res.status(400).json({
-                         error: 'Account parameter is required'
-                    })
+                    throw new AppError(ErrorCode.VALIDATION_ERROR, 400, 'Account parameter is required')
+               }
+
+               // Authorization check: user can only access their own account unless admin
+               if (!canAccessAccount(req, account)) {
+                    throw new AppError(ErrorCode.FORBIDDEN, 403, 'You can only access your own account')
                }
 
                const balance = await adapter.getBalance(account)
@@ -31,15 +54,14 @@ export function createBalanceRouter(adapter: SorobanAdapter) {
      })
 
      // Add endpoints for credit/debit operations
-     router.post('/balance/:account/credit', async (req: Request, res: Response, next: NextFunction) => {
+     router.post('/balance/:account/credit', authenticateToken, requirePermission('balance', 'modify'), validate(amountSchema, 'body'), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
           try {
                const { account } = req.params
                const { amount } = req.body
 
-               if (!amount || typeof amount !== 'string') {
-                    return res.status(400).json({
-                         error: 'Amount string is required in request body'
-                    })
+               // Authorization check: user can only modify their own account unless admin
+               if (!canAccessAccount(req, account)) {
+                    throw new AppError(ErrorCode.FORBIDDEN, 403, 'You can only modify your own account')
                }
 
                const amountBigInt = BigInt(amount)
@@ -60,15 +82,14 @@ export function createBalanceRouter(adapter: SorobanAdapter) {
           }
      })
 
-     router.post('/balance/:account/debit', async (req: Request, res: Response, next: NextFunction) => {
+     router.post('/balance/:account/debit', authenticateToken, requirePermission('balance', 'modify'), validate(amountSchema, 'body'), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
           try {
                const { account } = req.params
                const { amount } = req.body
 
-               if (!amount || typeof amount !== 'string') {
-                    return res.status(400).json({
-                         error: 'Amount string is required in request body'
-                    })
+               // Authorization check: user can only modify their own account unless admin
+               if (!canAccessAccount(req, account)) {
+                    throw new AppError(ErrorCode.FORBIDDEN, 403, 'You can only modify your own account')
                }
 
                const amountBigInt = BigInt(amount)
