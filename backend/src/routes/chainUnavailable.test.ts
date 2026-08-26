@@ -147,10 +147,10 @@ describe('chain-dependent routes when Soroban RPC is unavailable', () => {
         halfOpenTestRequests: 1,
       })
 
-      await expect(adapter.getBalance('GABC')).rejects.toThrow()
+      await expect(adapter.getBalance('test-user')).rejects.toThrow()
       const app = buildBalanceApp(adapter)
 
-      const res = await supertest(app).get('/api/balance/GABC')
+      const res = await supertest(app).get('/api/balance/test-user')
       expectChainUnavailableResponse(res)
     })
 
@@ -159,7 +159,7 @@ describe('chain-dependent routes when Soroban RPC is unavailable', () => {
       adapter.simulateRpcTimeout()
       const app = buildBalanceApp(adapter)
 
-      const res = await supertest(app).get('/api/balance/GABC')
+      const res = await supertest(app).get('/api/balance/test-user')
       expectChainUnavailableResponse(res)
     })
   })
