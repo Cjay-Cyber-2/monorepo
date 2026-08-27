@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  claimRewards,
   getStakingPosition,
   getMvpStakingPosition,
   MvpStakingPositionResponse,
@@ -25,6 +24,7 @@ import { PositionCard, formatUsdc } from "./PositionCard";
 import { StakeForm } from "./StakeForm";
 import { HistoryTable } from "./HistoryTable";
 import { DelegationPanel } from "./DelegationPanel";
+import { StakingClaimFlow } from "./StakingClaimFlow";
 import { stellarWallet } from "@/lib/stellar-wallet";
 import { walletAuthManager } from "@/lib/wallet-auth";
 import { useCountdown } from "@/hooks/useCountdown";
@@ -42,8 +42,8 @@ export default function StakingPage() {
   const [status, setStatus] = useState("");
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [isStaking, setIsStaking] = useState(false);
-  const [isClaiming, setIsClaiming] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isClaimFlowOpen, setIsClaimFlowOpen] = useState(false);
 
   // NGN Deposit flow state
   const [ngnDepositAmount, setNgnDepositAmount] = useState("");
@@ -217,27 +217,14 @@ export default function StakingPage() {
     }
   };
 
-  const handleClaim = async () => {
-    setIsClaiming(true);
-    setStatus("Claiming rewards...");
-    try {
-      const res = await claimRewards(walletAddress);
-
-      if (res.status === "CONFIRMED") {
-        setStatus("Rewards claimed");
-      } else {
-        setStatus("Claim queued for retry");
-      }
-
-      const updatedPosition = await getStakingPosition(walletAddress);
-      setStakingPosition(updatedPosition);
-
-    } catch (err: any) {
-      setStatus(err.message || "Claim failed");
-      handleError(err, "Claim failed");
-    } finally {
-      setIsClaiming(false);
-    }
+  const handleClaimFlowClose = () => {
+    setIsClaimFlowOpen(false);
+    // The flow may have just claimed rewards on-chain — refresh the position
+    // whether it did or not, so the claimable balance reflects reality.
+    if (!walletAddress) return;
+    getStakingPosition(walletAddress)
+      .then((data) => setStakingPosition(data))
+      .catch((err: Error) => console.error("Failed to refresh staking position", err));
   };
 
   const handleGetQuote = async () => {
@@ -494,18 +481,11 @@ export default function StakingPage() {
                   </div>
 
                   <Button
-                    onClick={handleClaim}
-                    disabled={isClaiming || !stakingPosition || Number(stakingPosition.position.claimable) <= 0}
+                    onClick={() => setIsClaimFlowOpen(true)}
+                    disabled={!stakingPosition || Number(stakingPosition.position.claimable) <= 0}
                     className="w-full h-10 border-2 border-primary bg-primary text-primary-foreground text-xs font-bold rounded-xl shadow-sm hover:shadow transition-all disabled:opacity-50"
                   >
-                    {isClaiming ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Claiming yield...
-                      </>
-                    ) : (
-                      "Claim accrued yield"
-                    )}
+                    Claim accrued yield
                   </Button>
                 </CardContent>
               </Card>
@@ -521,6 +501,12 @@ export default function StakingPage() {
             onConfirm={handleUnstake}
             maxAmount={stakingPosition ? Number(stakingPosition.position.staked).toFixed(6) : "0.000000"}
             warmingAmount={stakingPosition ? Number(stakingPosition.position.warming).toFixed(6) : "0.000000"}
+          />
+
+          <StakingClaimFlow
+            isOpen={isClaimFlowOpen}
+            onClose={handleClaimFlowClose}
+            rewardAmount={stakingPosition ? Number(stakingPosition.position.claimable) : 0}
           />
         </div>
       )}
