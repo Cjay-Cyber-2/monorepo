@@ -598,4 +598,41 @@ async requestRentRelease(params: RequestRentReleaseParams): Promise<void> {
           logger.debug('Soroban stub: rentWalletBalance', { account })
           return BigInt(0)
      }
+
+     // slashing_module contract methods (stub implementations)
+     async submitEvidence(submitter: string, commitment: string, actor: string, offence: string): Promise<number> {
+          logger.debug('Soroban stub: submitEvidence', { submitter, actor, offence })
+          return 1 // Return stub slash ID
+     }
+
+     async revealEvidence(submitter: string, slashId: number, evidence: string, salt: string): Promise<void> {
+          logger.debug('Soroban stub: revealEvidence', { submitter, slashId })
+     }
+
+     async proposeSlash(submitter: string, actor: string, penaltyBps: number): Promise<number> {
+          logger.debug('Soroban stub: proposeSlash', { submitter, actor, penaltyBps })
+          return 1 // Return stub slash ID
+     }
+
+     async finalizeSlash(caller: string, slashId: number): Promise<void> {
+          logger.debug('Soroban stub: finalizeSlash', { caller, slashId })
+     }
+
+     async cancelSlash(admin: string, slashId: number): Promise<void> {
+          logger.debug('Soroban stub: cancelSlash', { admin, slashId })
+     }
+
+     // bond_collateral contract methods (stub implementations)
+     async depositBond(inspector: string, amount: bigint): Promise<void> {
+          logger.debug('Soroban stub: depositBond', { inspector, amount: amount.toString() })
+     }
+
+     async withdrawBond(inspector: string, amount: bigint): Promise<void> {
+          logger.debug('Soroban stub: withdrawBond', { inspector, amount: amount.toString() })
+     }
+
+     async getBondBalance(inspector: string): Promise<bigint> {
+          logger.debug('Soroban stub: getBondBalance', { inspector })
+          return BigInt(0)
+     }
 }

@@ -33,6 +33,13 @@ export enum TxType {
   ALLOWLIST_REMOVE = 'allowlist_remove',
   RENT_WALLET_CREDIT = 'rent_wallet_credit',
   RENT_WALLET_DEBIT = 'rent_wallet_debit',
+  SLASHING_SUBMIT_EVIDENCE = 'slashing_submit_evidence',
+  SLASHING_REVEAL_EVIDENCE = 'slashing_reveal_evidence',
+  SLASHING_PROPOSE_SLASH = 'slashing_propose_slash',
+  SLASHING_FINALIZE_SLASH = 'slashing_finalize_slash',
+  SLASHING_CANCEL_SLASH = 'slashing_cancel_slash',
+  BOND_DEPOSIT = 'bond_deposit',
+  BOND_WITHDRAW = 'bond_withdraw',
 }
 
 /**

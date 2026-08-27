@@ -330,4 +330,16 @@ export interface SorobanAdapter {
   rentWalletCredit?(account: string, amount: bigint): Promise<string>
   rentWalletDebit?(account: string, amount: bigint): Promise<string>
   rentWalletBalance?(account: string): Promise<bigint>
+
+  // slashing_module contract — evidence-based slashing system
+  submitEvidence?(submitter: string, commitment: string, actor: string, offence: string): Promise<number>
+  revealEvidence?(submitter: string, slashId: number, evidence: string, salt: string): Promise<void>
+  proposeSlash?(submitter: string, actor: string, penaltyBps: number): Promise<number>
+  finalizeSlash?(caller: string, slashId: number): Promise<void>
+  cancelSlash?(admin: string, slashId: number): Promise<void>
+
+  // bond_collateral contract — inspector bond management
+  depositBond?(inspector: string, amount: bigint): Promise<void>
+  withdrawBond?(inspector: string, amount: bigint): Promise<void>
+  getBondBalance?(inspector: string): Promise<bigint>
 }

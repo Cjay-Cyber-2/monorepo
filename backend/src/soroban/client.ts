@@ -18,6 +18,8 @@ export type SorobanConfig = {
   allowlistRegistryId?: string
   epochRewardsId?: string
   rentWalletId?: string
+  slashingModuleId?: string
+  bondCollateralId?: string
   adminSecret?: string
   seed?: string | number
 }
@@ -42,6 +44,8 @@ export function getSorobanConfigFromEnv(env: NodeJS.ProcessEnv): SorobanConfig {
     allowlistRegistryId: addresses.allowlistRegistry,
     epochRewardsId: addresses.epochRewards,
     rentWalletId: addresses.rentWallet,
+    slashingModuleId: addresses.slashingModule,
+    bondCollateralId: addresses.bondCollateral,
     adminSecret: env.SOROBAN_ADMIN_SECRET,
     seed: env.SOROBAN_STUB_SEED,
   }
