@@ -2912,4 +2912,328 @@ export class RealSorobanAdapter implements SorobanAdapter {
       }
     })
   }
+
+  // ── slashing_module contract methods ─────────────────────────────────────
+
+  private getSlashingModuleId(): string {
+    if (!this.config.slashingModuleId) {
+      throw new ConfigurationError('SOROBAN_SLASHING_MODULE_ID not configured')
+    }
+    return this.config.slashingModuleId
+  }
+
+  async submitEvidence(submitter: string, commitment: string, actor: string, offence: string): Promise<number> {
+    const contractId = this.getSlashingModuleId()
+
+    return tracer.startActiveSpan('soroban.submit_evidence', async (span) => {
+      span.setAttributes({
+        'soroban.contract_id': contractId,
+        'soroban.submitter': submitter,
+        'soroban.actor': actor,
+        'soroban.offence': offence,
+      })
+
+      try {
+        const commitmentBytes = Buffer.from(commitment, 'hex')
+        const result = await this.invokeTransaction(
+          contractId,
+          'submit_evidence',
+          [
+            nativeToScVal(new Address(submitter)),
+            nativeToScVal(commitmentBytes),
+            nativeToScVal(new Address(actor)),
+            nativeToScVal(offence),
+          ]
+        )
+
+        const slashId = Number(scValToNative(result))
+        span.setAttributes({ 'soroban.slash_id': slashId })
+        logger.info('Evidence submitted to slashing module', { submitter, actor, offence, slashId })
+
+        return slashId
+      } catch (err) {
+        span.recordException(err as Error)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to submit evidence for ${actor}`,
+          contractId,
+          'submit_evidence',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  async revealEvidence(submitter: string, slashId: number, evidence: string, salt: string): Promise<void> {
+    const contractId = this.getSlashingModuleId()
+
+    return tracer.startActiveSpan('soroban.reveal_evidence', async (span) => {
+      span.setAttributes({
+        'soroban.contract_id': contractId,
+        'soroban.submitter': submitter,
+        'soroban.slash_id': slashId,
+      })
+
+      try {
+        const evidenceBytes = Buffer.from(evidence, 'hex')
+        const saltBytes = Buffer.from(salt, 'hex')
+
+        await this.invokeTransaction(
+          contractId,
+          'reveal_evidence',
+          [
+            nativeToScVal(new Address(submitter)),
+            nativeToScVal(slashId, { type: 'u64' }),
+            nativeToScVal(evidenceBytes),
+            nativeToScVal(saltBytes),
+          ]
+        )
+
+        logger.info('Evidence revealed in slashing module', { submitter, slashId })
+      } catch (err) {
+        span.recordException(err as Error)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to reveal evidence for slash ${slashId}`,
+          contractId,
+          'reveal_evidence',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  async proposeSlash(submitter: string, actor: string, penaltyBps: number): Promise<number> {
+    const contractId = this.getSlashingModuleId()
+
+    return tracer.startActiveSpan('soroban.propose_slash', async (span) => {
+      span.setAttributes({
+        'soroban.contract_id': contractId,
+        'soroban.submitter': submitter,
+        'soroban.actor': actor,
+        'soroban.penalty_bps': penaltyBps,
+      })
+
+      try {
+        const result = await this.invokeTransaction(
+          contractId,
+          'propose_slash',
+          [
+            nativeToScVal(new Address(submitter)),
+            nativeToScVal(new Address(actor)),
+            nativeToScVal(penaltyBps, { type: 'u32' }),
+          ]
+        )
+
+        const slashId = Number(scValToNative(result))
+        span.setAttributes({ 'soroban.slash_id': slashId })
+        logger.info('Slash proposed in slashing module', { submitter, actor, penaltyBps, slashId })
+
+        return slashId
+      } catch (err) {
+        span.recordException(err as Error)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to propose slash for ${actor}`,
+          contractId,
+          'propose_slash',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  async finalizeSlash(caller: string, slashId: number): Promise<void> {
+    const contractId = this.getSlashingModuleId()
+
+    return tracer.startActiveSpan('soroban.finalize_slash', async (span) => {
+      span.setAttributes({
+        'soroban.contract_id': contractId,
+        'soroban.caller': caller,
+        'soroban.slash_id': slashId,
+      })
+
+      try {
+        await this.invokeTransaction(
+          contractId,
+          'finalize_slash',
+          [
+            nativeToScVal(new Address(caller)),
+            nativeToScVal(slashId, { type: 'u64' }),
+          ]
+        )
+
+        logger.info('Slash finalized in slashing module', { caller, slashId })
+      } catch (err) {
+        span.recordException(err as Error)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to finalize slash ${slashId}`,
+          contractId,
+          'finalize_slash',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  async cancelSlash(admin: string, slashId: number): Promise<void> {
+    const contractId = this.getSlashingModuleId()
+
+    return tracer.startActiveSpan('soroban.cancel_slash', async (span) => {
+      span.setAttributes({
+        'soroban.contract_id': contractId,
+        'soroban.admin': admin,
+        'soroban.slash_id': slashId,
+      })
+
+      try {
+        await this.invokeTransaction(
+          contractId,
+          'cancel_slash',
+          [
+            nativeToScVal(new Address(admin)),
+            nativeToScVal(slashId, { type: 'u64' }),
+          ]
+        )
+
+        logger.info('Slash cancelled in slashing module', { admin, slashId })
+      } catch (err) {
+        span.recordException(err as Error)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to cancel slash ${slashId}`,
+          contractId,
+          'cancel_slash',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  // ── bond_collateral contract methods ──────────────────────────────────────
+
+  private getBondCollateralId(): string {
+    if (!this.config.bondCollateralId) {
+      throw new ConfigurationError('SOROBAN_BOND_COLLATERAL_ID not configured')
+    }
+    return this.config.bondCollateralId
+  }
+
+  async depositBond(inspector: string, amount: bigint): Promise<void> {
+    const contractId = this.getBondCollateralId()
+
+    return tracer.startActiveSpan('soroban.deposit_bond', async (span) => {
+      span.setAttributes({
+        'soroban.contract_id': contractId,
+        'soroban.inspector': inspector,
+        'soroban.amount': amount.toString(),
+      })
+
+      try {
+        await this.invokeTransaction(
+          contractId,
+          'deposit_bond',
+          [
+            nativeToScVal(new Address(inspector)),
+            nativeToScVal(amount, { type: 'i128' }),
+          ]
+        )
+
+        logger.info('Bond deposited in bond_collateral', { inspector, amount: amount.toString() })
+      } catch (err) {
+        span.recordException(err as Error)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to deposit bond for ${inspector}`,
+          contractId,
+          'deposit_bond',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  async withdrawBond(inspector: string, amount: bigint): Promise<void> {
+    const contractId = this.getBondCollateralId()
+
+    return tracer.startActiveSpan('soroban.withdraw_bond', async (span) => {
+      span.setAttributes({
+        'soroban.contract_id': contractId,
+        'soroban.inspector': inspector,
+        'soroban.amount': amount.toString(),
+      })
+
+      try {
+        await this.invokeTransaction(
+          contractId,
+          'withdraw_bond',
+          [
+            nativeToScVal(new Address(inspector)),
+            nativeToScVal(amount, { type: 'i128' }),
+          ]
+        )
+
+        logger.info('Bond withdrawn from bond_collateral', { inspector, amount: amount.toString() })
+      } catch (err) {
+        span.recordException(err as Error)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to withdraw bond for ${inspector}`,
+          contractId,
+          'withdraw_bond',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
+
+  async getBondBalance(inspector: string): Promise<bigint> {
+    const contractId = this.getBondCollateralId()
+
+    return tracer.startActiveSpan('soroban.get_bond', async (span) => {
+      span.setAttributes({
+        'soroban.contract_id': contractId,
+        'soroban.inspector': inspector,
+      })
+
+      try {
+        const result = await this.invokeReadOnly({
+          contractId,
+          method: 'get_bond',
+          args: [nativeToScVal(new Address(inspector))],
+        })
+
+        const balance = BigInt(scValToNative(result))
+        span.setAttributes({ 'soroban.bond_balance': balance.toString() })
+
+        return balance
+      } catch (err) {
+        span.recordException(err as Error)
+        if (err instanceof SorobanError) throw err
+        throw new ContractError(
+          `Failed to get bond balance for ${inspector}`,
+          contractId,
+          'get_bond',
+          err
+        )
+      } finally {
+        span.end()
+      }
+    })
+  }
 }
