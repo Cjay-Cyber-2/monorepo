@@ -14,5 +14,4 @@ export const defaultPersistConfig = (name: string) => ({
 export { default as useAuthStore } from "./useAuthStore";
 export { default as useRiskStore } from "./useRiskStore";
 export { default as usePreferencesStore } from "./usePreferencesStore";
-export { default as useCartStore } from "./useCartStore";
 export { default as useSessionStore } from "./useSessionStore";
