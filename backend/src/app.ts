@@ -160,6 +160,7 @@ import { createReferralsRouter } from "./routes/referrals.js";
 import { createLandlordPayoutScheduleRouter } from "./routes/landlordPayoutSchedule.js";
 import { createDocsRouter } from "./routes/docs.js";
 import { createListingsRouter } from "./routes/listings.js";
+import { createLeaseAgreementsRouter } from "./routes/leaseAgreements.js";
 import listingApplicationsRouter from "./routes/listingApplications.js";
 import { createKycRouter } from "./routes/kyc.js";
 import { createAdminRolesRouter } from "./routes/adminRoles.js";
@@ -797,6 +798,7 @@ export function createApp() {
     app.use("/api/admin", createAdminAuditRouter());
     app.use("/api/admin/erasure", createAdminErasureRouter());
     app.use("/api/deals", createDealsRouter());
+    app.use("/api", createLeaseAgreementsRouter());
     app.use("/api", createEmployersRouter());
     app.use("/api/whistleblower", createWhistleblowerRouter(earningsService));
     app.use("/api/whistleblower-applications", createWhistleblowerApplicationsRouter());
@@ -896,7 +898,7 @@ export function createApp() {
   app.use("/api/v1/admin/audit-logs", createAdminAuditLogsRouter());
   app.use("/api/v1/admin/erasure", createAdminErasureRouter());
   app.use("/api/v1/deals", createDealsRouter());
-  app.use("/api/v1", createEmployersRouter());
+  app.use("/api/v1", createLeaseAgreementsRouter());
   app.use("/api/v1/whistleblower", createWhistleblowerRouter(earningsService));
   app.use("/api/v1/whistleblower-applications", createWhistleblowerApplicationsRouter());
   app.use("/api/v1/admin/whistleblower-applications", createAdminWhistleblowerApplicationsRouter());
