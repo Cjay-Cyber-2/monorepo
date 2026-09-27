@@ -49,6 +49,7 @@ function PropertiesContent() {
   const [totalPages, setTotalPages] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
   const [searchQuery, setSearchQuery] = useState(
     searchParams.get("query") || "",
   );
@@ -200,6 +201,7 @@ function PropertiesContent() {
     maxAnnualRent,
     sortBy,
     page,
+    refetchTrigger,
   ]);
 
   useEffect(() => {
@@ -623,7 +625,7 @@ function PropertiesContent() {
                 label: "Try again",
                 onClick: () => {
                   setHasError(false);
-                  router.refresh();
+                  setRefetchTrigger((prev) => prev + 1);
                 },
               }}
             />
