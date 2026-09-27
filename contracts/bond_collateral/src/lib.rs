@@ -681,11 +681,23 @@ impl BondCollateral {
         let seize_amount = raw_seize.max(1).min(collateral);
 
         // Bond debt retired is proportional to the oracle value of seized collateral.
-        let bond_reduction = (seize_amount * effective_price / PRICE_SCALE).min(bond);
+        let bond_reduction = match seize_amount.checked_mul(effective_price) {
+            Some(prod) => match prod.checked_div(PRICE_SCALE) {
+                Some(res) => res.min(bond),
+                None => return Err(ContractError::InsufficientCollateral),
+            },
+            None => return Err(ContractError::InsufficientCollateral),
+        };
 
         // Keeper reward bounded by reward cap bps of seized collateral.
         let reward_cap = get_keeper_reward_cap(&env);
-        let keeper_reward = (seize_amount * reward_cap as i128 / 10_000).min(seize_amount);
+        let keeper_reward = match seize_amount.checked_mul(reward_cap as i128) {
+            Some(prod) => match prod.checked_div(10_000) {
+                Some(res) => res.min(seize_amount),
+                None => return Err(ContractError::InsufficientCollateral),
+            },
+            None => return Err(ContractError::InsufficientCollateral),
+        };
 
         // Update position accounting.
         let new_collateral = collateral - seize_amount;
