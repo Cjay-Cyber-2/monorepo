@@ -7,6 +7,9 @@ use soroban_sdk::{
 
 pub mod access_control;
 
+#[cfg(kani)]
+mod formal_properties;
+
 const DEFAULT_STALENESS_SECONDS: u64 = 600;
 const DEFAULT_MAX_DEVIATION_BPS: u64 = 500; // 5% in basis points
 const PRICE_DECIMALS: u32 = 7;
