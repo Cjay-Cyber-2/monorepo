@@ -684,9 +684,9 @@ impl BondCollateral {
         let bond_reduction = match seize_amount.checked_mul(effective_price) {
             Some(prod) => match prod.checked_div(PRICE_SCALE) {
                 Some(res) => res.min(bond),
-                None => return Err(ContractError::InsufficientCollateral),
+                None => return Err(ContractError::InvalidAmount),
             },
-            None => return Err(ContractError::InsufficientCollateral),
+            None => return Err(ContractError::InvalidAmount),
         };
 
         // Keeper reward bounded by reward cap bps of seized collateral.
@@ -694,9 +694,9 @@ impl BondCollateral {
         let keeper_reward = match seize_amount.checked_mul(reward_cap as i128) {
             Some(prod) => match prod.checked_div(10_000) {
                 Some(res) => res.min(seize_amount),
-                None => return Err(ContractError::InsufficientCollateral),
+                None => return Err(ContractError::InvalidAmount),
             },
-            None => return Err(ContractError::InsufficientCollateral),
+            None => return Err(ContractError::InvalidAmount),
         };
 
         // Update position accounting.
