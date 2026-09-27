@@ -103,7 +103,10 @@ fn verify_slash_cannot_produce_negative_balance() {
     let client = SlashingModuleClient::new(&env, &contract_id);
 
     client.try_init(&admin).unwrap().unwrap();
-    client.try_add_submitter(&admin, &submitter).unwrap().unwrap();
+    client
+        .try_add_submitter(&admin, &submitter)
+        .unwrap()
+        .unwrap();
 
     // Seed a modest stake
     let initial_stake: i128 = 100;
@@ -154,7 +157,10 @@ fn verify_duplicate_evidence_rejected() {
     let client = SlashingModuleClient::new(&env, &contract_id);
 
     client.try_init(&admin).unwrap().unwrap();
-    client.try_add_submitter(&admin, &submitter).unwrap().unwrap();
+    client
+        .try_add_submitter(&admin, &submitter)
+        .unwrap()
+        .unwrap();
     client
         .try_set_staked_balance(&admin, &actor, &1_000_000i128)
         .unwrap()
