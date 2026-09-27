@@ -48,6 +48,7 @@ function PropertiesContent() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const [searchQuery, setSearchQuery] = useState(
     searchParams.get("query") || "",
   );
@@ -115,6 +116,7 @@ function PropertiesContent() {
 
   const clearAllFilters = () => {
     setSearchQuery("");
+    setHasError(false);
     router.push("/properties");
   };
 
@@ -137,6 +139,7 @@ function PropertiesContent() {
       (async () => {
         if (!cancelled) {
           setIsLoading(true);
+          setHasError(false);
           try {
             const filters: PropertySearchFilters = {
               sortBy: (sortBy as PropertySearchFilters["sortBy"]) || "newest",
@@ -171,6 +174,7 @@ function PropertiesContent() {
               console.error("Failed to fetch properties:", error);
               setProperties([]);
               setTotal(0);
+              setHasError(true);
             }
           } finally {
             if (!cancelled) {
@@ -610,6 +614,19 @@ function PropertiesContent() {
                 <PropertyCardSkeleton key={i} />
               ))}
             </LoadingState>
+          ) : hasError ? (
+            <EmptyState
+              icon={SearchX}
+              title="Something went wrong"
+              description="We encountered an error while trying to fetch the properties. Please try again."
+              action={{
+                label: "Try again",
+                onClick: () => {
+                  setHasError(false);
+                  router.refresh();
+                },
+              }}
+            />
           ) : properties.length === 0 ? (
             <EmptyState
               icon={SearchX}
