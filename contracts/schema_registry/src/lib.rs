@@ -19,6 +19,8 @@
 //! If any step fails the contract panics and the ledger transaction reverts,
 //! leaving the state unchanged.
 
+#[cfg(kani)]
+pub mod formal_properties;
 use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, Map, String, Symbol, Vec};
 
 // ── Storage keys ──────────────────────────────────────────────────────────────
