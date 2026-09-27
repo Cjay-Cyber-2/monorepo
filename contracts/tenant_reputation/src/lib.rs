@@ -47,6 +47,9 @@ pub enum ContractError {
 #[contract]
 pub struct TenantReputation;
 
+#[cfg(kani)]
+mod formal_properties;
+
 fn get_admin(env: &Env) -> Address {
     env.storage()
         .instance()

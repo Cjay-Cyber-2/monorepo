@@ -6,6 +6,469 @@ use soroban_sdk::{
 
 // ── Storage Keys ──────────────────────────────────────────────────────────────
 
+#[cfg(test)]
+mod tests {
+    extern crate std;
+
+    use super::*;
+    use soroban_sdk::{testutils::Address as _, Env};
+
+    fn setup(env: &Env) -> (Address, RentToOwnClient<'_>) {
+        env.mock_all_auths();
+        let id = env.register(RentToOwn, ());
+        let client = RentToOwnClient::new(env, &id);
+        let admin = Address::generate(env);
+        // Default: 20% forfeiture on default
+        client.init(&admin, &2000u32);
+        (admin, client)
+    }
+
+    fn make_deal_id(env: &Env, seed: u8) -> BytesN<32> {
+        BytesN::from_array(env, &[seed; 32])
+    }
+
+    #[test]
+    fn full_lifecycle_register_payments_complete() {
+        let env = Env::default();
+        let (admin, client) = setup(&env);
+        let tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 1);
+
+        client.register_deal(&admin, &deal_id, &tenant, &100_000, &10_000, &10);
+
+        for _ in 0..10 {
+            client.record_equity_payment(&admin, &deal_id, &15_000, &10_000);
+        }
+
+        let deal = client.get_deal(&deal_id).unwrap();
+        assert_eq!(deal.payments_made, 10);
+        assert_eq!(deal.equity_accumulated_usdc, 100_000);
+
+        client.complete_deal(&admin, &deal_id);
+        let deal = client.get_deal(&deal_id).unwrap();
+        assert!(matches!(deal.status, DealStatus::Completed));
+    }
+
+    #[test]
+    fn equity_is_monotonically_increasing() {
+        let env = Env::default();
+        let (admin, client) = setup(&env);
+        let tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 2);
+
+        client.register_deal(&admin, &deal_id, &tenant, &100_000, &10_000, &5);
+
+        let mut prev_equity = 0i128;
+        for _ in 0..5 {
+            client.record_equity_payment(&admin, &deal_id, &15_000, &10_000);
+            let deal = client.get_deal(&deal_id).unwrap();
+            assert!(deal.equity_accumulated_usdc > prev_equity);
+            prev_equity = deal.equity_accumulated_usdc;
+        }
+    }
+
+    #[test]
+    fn default_mid_deal() {
+        let env = Env::default();
+        let (admin, client) = setup(&env);
+        let tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 3);
+
+        client.register_deal(&admin, &deal_id, &tenant, &100_000, &10_000, &10);
+        client.record_equity_payment(&admin, &deal_id, &15_000, &10_000);
+        client.record_equity_payment(&admin, &deal_id, &15_000, &10_000);
+
+        client.default_deal(&admin, &deal_id, &Symbol::new(&env, "missed_payment"));
+        let deal = client.get_deal(&deal_id).unwrap();
+        assert!(matches!(deal.status, DealStatus::Defaulted));
+        assert_eq!(deal.equity_accumulated_usdc, 20_000);
+    }
+
+    #[test]
+    fn overpayment_protection() {
+        let env = Env::default();
+        let (admin, client) = setup(&env);
+        let tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 4);
+
+        client.register_deal(&admin, &deal_id, &tenant, &10_000, &6_000, &2);
+        client.record_equity_payment(&admin, &deal_id, &8_000, &6_000);
+
+        let result = client.try_record_equity_payment(&admin, &deal_id, &8_000, &6_000);
+        assert_eq!(result.unwrap_err().unwrap(), ContractError::EquityOverflow);
+    }
+
+    #[test]
+    fn complete_deal_fails_if_payments_not_done() {
+        let env = Env::default();
+        let (admin, client) = setup(&env);
+        let tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 5);
+
+        client.register_deal(&admin, &deal_id, &tenant, &100_000, &10_000, &10);
+        client.record_equity_payment(&admin, &deal_id, &15_000, &10_000);
+
+        let result = client.try_complete_deal(&admin, &deal_id);
+        assert_eq!(
+            result.unwrap_err().unwrap(),
+            ContractError::PaymentsNotComplete
+        );
+    }
+
+    #[test]
+    fn equity_percentage_correct() {
+        let env = Env::default();
+        let (admin, client) = setup(&env);
+        let tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 6);
+
+        client.register_deal(&admin, &deal_id, &tenant, &100_000, &25_000, &4);
+        client.record_equity_payment(&admin, &deal_id, &30_000, &25_000);
+
+        assert_eq!(client.get_equity_percentage(&deal_id), 2_500);
+    }
+
+    #[test]
+    fn non_admin_cannot_register_deal() {
+        let env = Env::default();
+        let (_admin, client) = setup(&env);
+        let attacker = Address::generate(&env);
+        let tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 7);
+
+        let result = client.try_register_deal(&attacker, &deal_id, &tenant, &100_000, &10_000, &10);
+        assert_eq!(result.unwrap_err().unwrap(), ContractError::NotAuthorized);
+    }
+
+    #[test]
+    fn payment_on_completed_deal_fails() {
+        let env = Env::default();
+        let (admin, client) = setup(&env);
+        let tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 8);
+
+        client.register_deal(&admin, &deal_id, &tenant, &10_000, &10_000, &1);
+        client.record_equity_payment(&admin, &deal_id, &10_000, &10_000);
+        client.complete_deal(&admin, &deal_id);
+
+        let result = client.try_record_equity_payment(&admin, &deal_id, &10_000, &10_000);
+        assert_eq!(result.unwrap_err().unwrap(), ContractError::DealNotActive);
+    }
+
+    // ── Issue #1133: Default equity policy tests ──────────────────────────────
+
+    #[test]
+    fn default_equity_split_correct() {
+        let env = Env::default();
+        // 30% forfeiture
+        env.mock_all_auths();
+        let id = env.register(RentToOwn, ());
+        let client = RentToOwnClient::new(&env, &id);
+        let admin = Address::generate(&env);
+        let tenant = Address::generate(&env);
+        client.init(&admin, &3000u32); // 30% forfeiture
+        let deal_id = make_deal_id(&env, 20);
+
+        client.register_deal(&admin, &deal_id, &tenant, &100_000, &10_000, &10);
+        // Make 4 payments: equity = 40_000
+        for _ in 0..4 {
+            client.record_equity_payment(&admin, &deal_id, &15_000, &10_000);
+        }
+
+        client.default_deal(&admin, &deal_id, &Symbol::new(&env, "default"));
+
+        let settlement = client.get_default_settlement(&deal_id).unwrap();
+        // 40_000 * 3000 / 10_000 = 12_000 forfeited
+        // 40_000 - 12_000 = 28_000 refundable
+        assert_eq!(settlement.forfeited_usdc, 12_000);
+        assert_eq!(settlement.refundable_usdc, 28_000);
+        assert_eq!(
+            settlement.refundable_usdc + settlement.forfeited_usdc,
+            40_000
+        );
+        assert!(!settlement.settled);
+    }
+
+    #[test]
+    fn double_settlement_rejected() {
+        let env = Env::default();
+        let (admin, client) = setup(&env);
+        let tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 21);
+
+        client.register_deal(&admin, &deal_id, &tenant, &100_000, &10_000, &10);
+        client.record_equity_payment(&admin, &deal_id, &15_000, &10_000);
+
+        client.default_deal(&admin, &deal_id, &Symbol::new(&env, "default"));
+
+        // First settlement succeeds
+        let s = client.settle_default(&admin, &deal_id);
+        assert!(s.settled);
+
+        // Second settlement is rejected
+        let err = client
+            .try_settle_default(&admin, &deal_id)
+            .unwrap_err()
+            .unwrap();
+        assert_eq!(err, ContractError::AlreadySettled);
+    }
+
+    #[test]
+    fn complete_vs_default_divergence() {
+        let env = Env::default();
+        let (admin, client) = setup(&env);
+        let tenant = Address::generate(&env);
+        let deal_id_a = make_deal_id(&env, 22);
+        let deal_id_b = make_deal_id(&env, 23);
+
+        // Deal A: completes normally — full equity to tenant, no split
+        client.register_deal(&admin, &deal_id_a, &tenant, &10_000, &10_000, &1);
+        client.record_equity_payment(&admin, &deal_id_a, &10_000, &10_000);
+        client.complete_deal(&admin, &deal_id_a);
+        let deal_a = client.get_deal(&deal_id_a).unwrap();
+        assert!(matches!(deal_a.status, DealStatus::Completed));
+        // No settlement record for completed deal
+        assert!(client.get_default_settlement(&deal_id_a).is_none());
+
+        // Deal B: defaults — equity is split
+        client.register_deal(&admin, &deal_id_b, &tenant, &10_000, &10_000, &1);
+        client.record_equity_payment(&admin, &deal_id_b, &10_000, &10_000);
+        // Can't complete if we want to default — use a fresh deal without completing
+        let deal_id_c = make_deal_id(&env, 24);
+        client.register_deal(&admin, &deal_id_c, &tenant, &10_000, &2_000, &5);
+        client.record_equity_payment(&admin, &deal_id_c, &5_000, &2_000);
+        client.default_deal(&admin, &deal_id_c, &Symbol::new(&env, "test"));
+        let deal_c = client.get_deal(&deal_id_c).unwrap();
+        assert!(matches!(deal_c.status, DealStatus::Defaulted));
+        assert!(client.get_default_settlement(&deal_id_c).is_some());
+    }
+
+    #[test]
+    fn zero_equity_default() {
+        let env = Env::default();
+        let (admin, client) = setup(&env);
+        let tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 25);
+
+        client.register_deal(&admin, &deal_id, &tenant, &100_000, &10_000, &10);
+        // No payments made; equity = 0
+        client.default_deal(&admin, &deal_id, &Symbol::new(&env, "no_payments"));
+
+        let settlement = client.get_default_settlement(&deal_id).unwrap();
+        assert_eq!(settlement.refundable_usdc, 0);
+        assert_eq!(settlement.forfeited_usdc, 0);
+
+        // Settlement of zero-equity deal should still succeed once
+        let s = client.settle_default(&admin, &deal_id);
+        assert!(s.settled);
+    }
+
+    #[test]
+    fn settle_non_defaulted_deal_rejected() {
+        let env = Env::default();
+        let (admin, client) = setup(&env);
+        let tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 26);
+
+        client.register_deal(&admin, &deal_id, &tenant, &10_000, &10_000, &1);
+        // Still active — settle_default must fail
+        let err = client
+            .try_settle_default(&admin, &deal_id)
+            .unwrap_err()
+            .unwrap();
+        assert_eq!(err, ContractError::DealNotDefaulted);
+    }
+
+    // ── Issue #1251: Equity transfer/assignment tests ─────────────────────────
+
+    #[test]
+    fn authorized_transfer_succeeds() {
+        let env = Env::default();
+        let (admin, client) = setup(&env);
+        let tenant = Address::generate(&env);
+        let new_tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 30);
+
+        client.register_deal(&admin, &deal_id, &tenant, &100_000, &10_000, &10);
+        client.record_equity_payment(&admin, &deal_id, &15_000, &10_000);
+
+        let deal_before = client.get_deal(&deal_id).unwrap();
+        assert_eq!(deal_before.tenant, tenant);
+        assert_eq!(deal_before.equity_accumulated_usdc, 10_000);
+
+        // Transfer succeeds with admin authorization
+        client.transfer_position(&admin, &tenant, &new_tenant, &deal_id);
+
+        let deal_after = client.get_deal(&deal_id).unwrap();
+        assert_eq!(deal_after.tenant, new_tenant);
+        // Equity is conserved exactly
+        assert_eq!(deal_after.equity_accumulated_usdc, 10_000);
+        assert_eq!(deal_after.payments_made, 1);
+    }
+
+    #[test]
+    fn unauthorized_transfer_rejected() {
+        let env = Env::default();
+        let (admin, client) = setup(&env);
+        let tenant = Address::generate(&env);
+        let attacker = Address::generate(&env);
+        let new_tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 31);
+
+        client.register_deal(&admin, &deal_id, &tenant, &100_000, &10_000, &10);
+
+        // Attacker cannot transfer someone else's position
+        let err = client
+            .try_transfer_position(&admin, &attacker, &new_tenant, &deal_id)
+            .unwrap_err()
+            .unwrap();
+        assert_eq!(err, ContractError::NotAuthorized);
+    }
+
+    #[test]
+    fn transfer_without_admin_rejected() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let id = env.register(RentToOwn, ());
+        let client = RentToOwnClient::new(&env, &id);
+        let admin = Address::generate(&env);
+        let tenant = Address::generate(&env);
+        let new_tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 32);
+
+        client.init(&admin, &2000u32);
+        client.register_deal(&admin, &deal_id, &tenant, &100_000, &10_000, &10);
+
+        // Non-admin cannot authorize transfer
+        let random = Address::generate(&env);
+        let err = client
+            .try_transfer_position(&random, &tenant, &new_tenant, &deal_id)
+            .unwrap_err()
+            .unwrap();
+        assert_eq!(err, ContractError::NotAuthorized);
+    }
+
+    #[test]
+    fn transfer_on_completed_deal_rejected() {
+        let env = Env::default();
+        let (admin, client) = setup(&env);
+        let tenant = Address::generate(&env);
+        let new_tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 33);
+
+        client.register_deal(&admin, &deal_id, &tenant, &10_000, &10_000, &1);
+        client.record_equity_payment(&admin, &deal_id, &10_000, &10_000);
+        client.complete_deal(&admin, &deal_id);
+
+        // Cannot transfer completed deal
+        let err = client
+            .try_transfer_position(&admin, &tenant, &new_tenant, &deal_id)
+            .unwrap_err()
+            .unwrap();
+        assert_eq!(err, ContractError::InvalidTransfer);
+    }
+
+    #[test]
+    fn transfer_on_defaulted_deal_rejected() {
+        let env = Env::default();
+        let (admin, client) = setup(&env);
+        let tenant = Address::generate(&env);
+        let new_tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 34);
+
+        client.register_deal(&admin, &deal_id, &tenant, &100_000, &10_000, &10);
+        client.record_equity_payment(&admin, &deal_id, &15_000, &10_000);
+        client.default_deal(&admin, &deal_id, &Symbol::new(&env, "test"));
+
+        // Cannot transfer defaulted deal
+        let err = client
+            .try_transfer_position(&admin, &tenant, &new_tenant, &deal_id)
+            .unwrap_err()
+            .unwrap();
+        assert_eq!(err, ContractError::InvalidTransfer);
+    }
+
+    #[test]
+    fn transfer_to_same_address_rejected() {
+        let env = Env::default();
+        let (admin, client) = setup(&env);
+        let tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 35);
+
+        client.register_deal(&admin, &deal_id, &tenant, &100_000, &10_000, &10);
+
+        // Cannot transfer to self
+        let err = client
+            .try_transfer_position(&admin, &tenant, &tenant, &deal_id)
+            .unwrap_err()
+            .unwrap();
+        assert_eq!(err, ContractError::InvalidTransfer);
+    }
+
+    #[test]
+    fn equity_conserved_across_transfer() {
+        let env = Env::default();
+        let (admin, client) = setup(&env);
+        let tenant = Address::generate(&env);
+        let new_tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 36);
+
+        client.register_deal(&admin, &deal_id, &tenant, &100_000, &10_000, &10);
+
+        // Build up equity
+        for _ in 0..5 {
+            client.record_equity_payment(&admin, &deal_id, &15_000, &10_000);
+        }
+
+        let equity_before = client.get_deal(&deal_id).unwrap().equity_accumulated_usdc;
+        assert_eq!(equity_before, 50_000);
+
+        client.transfer_position(&admin, &tenant, &new_tenant, &deal_id);
+
+        let equity_after = client.get_deal(&deal_id).unwrap().equity_accumulated_usdc;
+        assert_eq!(equity_after, 50_000);
+        // Equity percentage should remain the same
+        assert_eq!(client.get_equity_percentage(&deal_id), 5000);
+    }
+
+    #[test]
+    fn post_transfer_payments_accrue_to_new_holder() {
+        let env = Env::default();
+        let (admin, client) = setup(&env);
+        let tenant = Address::generate(&env);
+        let new_tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 37);
+
+        client.register_deal(&admin, &deal_id, &tenant, &100_000, &10_000, &10);
+        client.record_equity_payment(&admin, &deal_id, &15_000, &10_000);
+
+        client.transfer_position(&admin, &tenant, &new_tenant, &deal_id);
+
+        // New payments should accrue to new holder
+        client.record_equity_payment(&admin, &deal_id, &15_000, &10_000);
+
+        let deal = client.get_deal(&deal_id).unwrap();
+        assert_eq!(deal.tenant, new_tenant);
+        assert_eq!(deal.equity_accumulated_usdc, 20_000);
+        assert_eq!(deal.payments_made, 2);
+    }
+
+    #[test]
+    fn transfer_on_nonexistent_deal_rejected() {
+        let env = Env::default();
+        let (admin, client) = setup(&env);
+        let tenant = Address::generate(&env);
+        let new_tenant = Address::generate(&env);
+        let deal_id = make_deal_id(&env, 38);
+
+        // Cannot transfer non-existent deal
+        let err = client
+            .try_transfer_position(&admin, &tenant, &new_tenant, &deal_id)
+            .unwrap_err()
+            .unwrap();
+        assert_eq!(err, ContractError::DealNotFound);
+    }
+}
 #[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
@@ -461,8 +924,11 @@ impl RentToOwn {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
+#[cfg(kani)]
+mod formal_properties;
+
 #[cfg(test)]
-mod tests {
+mod test {
     extern crate std;
 
     use super::*;
