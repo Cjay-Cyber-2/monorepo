@@ -1,6 +1,7 @@
 #![cfg(kani)]
 
 use super::*;
+use soroban_sdk::{Address, Env, Symbol};
 
 #[kani::proof]
 pub fn verify_reputation_score_bounds() {
@@ -41,4 +42,32 @@ pub fn verify_score_decay_invariants() {
 
     assert!(new_score <= score);
     assert!(new_score <= 1000);
+}
+#[kani::proof]
+pub fn verify_tenant_reputation_init_and_update() {
+    let env = Env::default();
+    let contract_id = env.register(TenantReputation, ());
+    let client = TenantReputationClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let operator = Address::generate(&env);
+    let tenant = Address::generate(&env);
+    env.mock_all_auths();
+
+    client.init(&admin, &operator).unwrap();
+
+    client
+        .update_reputation(
+            &operator,
+            &tenant,
+            &800,
+            &850,
+            &900,
+            &750,
+            &Symbol::new(&env, "payment_on_time"),
+        )
+        .unwrap();
+
+    let record = client.get_reputation(&tenant).unwrap();
+    assert_eq!(record.composite_score, 800);
+    assert_eq!(record.total_ratings, 1);
 }
