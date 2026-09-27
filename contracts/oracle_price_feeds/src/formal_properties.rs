@@ -54,7 +54,10 @@ fn verify_stale_price_rejected() {
     assert!(result.is_err(), "get_price must fail on stale feed");
 
     // Property: is_stale must agree
-    assert!(client.is_stale(&pair), "is_stale must return true past threshold");
+    assert!(
+        client.is_stale(&pair),
+        "is_stale must return true past threshold"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -94,14 +97,20 @@ fn verify_sequence_monotonicity() {
     // Replay with the same sequence — must fail
     let replay_result = client.try_update_price(&operator, &pair, &9_999i128, &5u64);
     assert!(
-        matches!(replay_result.unwrap_err().unwrap(), ContractError::InvalidSequence),
+        matches!(
+            replay_result.unwrap_err().unwrap(),
+            ContractError::InvalidSequence
+        ),
         "replay sequence must be rejected"
     );
 
     // Replay with lower sequence — must also fail
     let lower_result = client.try_update_price(&operator, &pair, &9_999i128, &3u64);
     assert!(
-        matches!(lower_result.unwrap_err().unwrap(), ContractError::InvalidSequence),
+        matches!(
+            lower_result.unwrap_err().unwrap(),
+            ContractError::InvalidSequence
+        ),
         "lower sequence must be rejected"
     );
 
@@ -169,7 +178,10 @@ fn verify_deviation_bounds_enforced() {
 
     // Price must remain at 10_000 after both rejections
     let price = client.get_price_unsafe(&pair).price;
-    assert_eq!(price, 10_000, "price must be unchanged after rejected updates");
+    assert_eq!(
+        price, 10_000,
+        "price must be unchanged after rejected updates"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -247,5 +259,8 @@ fn verify_fresh_price_readable() {
         feed.price, submitted_price,
         "get_price must return the last valid submitted price"
     );
-    assert!(!client.is_stale(&pair), "feed must not be stale immediately after update");
+    assert!(
+        !client.is_stale(&pair),
+        "feed must not be stale immediately after update"
+    );
 }

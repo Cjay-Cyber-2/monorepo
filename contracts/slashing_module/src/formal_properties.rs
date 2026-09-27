@@ -2,7 +2,7 @@
 
 use soroban_sdk::{Address, Bytes, Env, String, Symbol};
 
-use crate::{ContractError, DataKey, SlashingModule, SlashStatus};
+use crate::{ContractError, DataKey, SlashStatus, SlashingModule};
 
 // ── Slashing Module — Formal Verification Properties ─────────────────────────
 //
@@ -39,7 +39,10 @@ fn verify_slash_amount_correctness() {
     client.try_init(&admin).unwrap().unwrap();
 
     // Register submitter
-    client.try_add_submitter(&admin, &submitter).unwrap().unwrap();
+    client
+        .try_add_submitter(&admin, &submitter)
+        .unwrap()
+        .unwrap();
 
     // Seed staked balance for actor: 1_000_000
     let initial_stake: i128 = 1_000_000;
@@ -115,7 +118,13 @@ fn verify_slash_cannot_produce_negative_balance() {
     let excessive_slash: i128 = 999_999;
 
     // Slash must succeed (capped) or fail — either way balance must be ≥ 0
-    let _ = client.try_submit_slash(&submitter, &actor, &excessive_slash, &evidence_hash, &reason);
+    let _ = client.try_submit_slash(
+        &submitter,
+        &actor,
+        &excessive_slash,
+        &evidence_hash,
+        &reason,
+    );
 
     let final_staked: i128 = client.get_staked_balance(&actor);
     assert!(

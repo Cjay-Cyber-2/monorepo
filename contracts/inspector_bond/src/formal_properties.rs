@@ -54,10 +54,7 @@ fn verify_bond_custody_consistency() {
     );
 
     // Property: initial slash count must be zero
-    assert_eq!(
-        record.slash_count, 0,
-        "initial slash count must be zero"
-    );
+    assert_eq!(record.slash_count, 0, "initial slash count must be zero");
 }
 
 // ---------------------------------------------------------------------------

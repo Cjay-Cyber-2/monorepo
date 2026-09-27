@@ -2,7 +2,7 @@
 
 use soroban_sdk::{Address, BytesN, Env};
 
-use crate::{ContractError, DataKey, DealId, RentPayments, ReceiptId, TxId};
+use crate::{ContractError, DataKey, DealId, ReceiptId, RentPayments, TxId};
 
 // ── Rent Payments — Formal Verification Properties ───────────────────────────
 //
@@ -45,8 +45,7 @@ fn verify_payment_idempotency() {
         .unwrap();
 
     // Second recording with the same reference — must fail
-    let dup_result =
-        client.try_record_payment(&deal_id, &amount, &tx_id, &payer, &reference);
+    let dup_result = client.try_record_payment(&deal_id, &amount, &tx_id, &payer, &reference);
 
     assert!(
         matches!(
@@ -141,7 +140,10 @@ fn verify_receipt_fields_match_inputs() {
     let receipt = page.receipts.get(0).unwrap();
     assert_eq!(receipt.amount, amount, "stored amount must match input");
     assert_eq!(receipt.payer, payer, "stored payer must match input");
-    assert_eq!(receipt.reference, reference, "stored reference must match input");
+    assert_eq!(
+        receipt.reference, reference,
+        "stored reference must match input"
+    );
     assert_eq!(receipt.deal_id, deal_id, "stored deal_id must match input");
 }
 
@@ -173,18 +175,22 @@ fn verify_non_positive_amount_rejected() {
     let reference_neg: BytesN<32> = BytesN::from_array(&env, &[21u8; 32]);
 
     // Zero amount — must fail
-    let zero_result =
-        client.try_record_payment(&deal_id, &0i128, &tx_id, &payer, &reference_zero);
+    let zero_result = client.try_record_payment(&deal_id, &0i128, &tx_id, &payer, &reference_zero);
     assert!(
-        matches!(zero_result.unwrap_err().unwrap(), ContractError::InvalidAmount),
+        matches!(
+            zero_result.unwrap_err().unwrap(),
+            ContractError::InvalidAmount
+        ),
         "zero amount must be rejected"
     );
 
     // Negative amount — must fail
-    let neg_result =
-        client.try_record_payment(&deal_id, &(-1i128), &tx_id, &payer, &reference_neg);
+    let neg_result = client.try_record_payment(&deal_id, &(-1i128), &tx_id, &payer, &reference_neg);
     assert!(
-        matches!(neg_result.unwrap_err().unwrap(), ContractError::InvalidAmount),
+        matches!(
+            neg_result.unwrap_err().unwrap(),
+            ContractError::InvalidAmount
+        ),
         "negative amount must be rejected"
     );
 
