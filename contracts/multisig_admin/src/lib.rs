@@ -1,4 +1,8 @@
 #![no_std]
+
+#[cfg(kani)]
+mod formal_properties;
+
 use soroban_sdk::{contract, contractimpl, contracttype, Address, Bytes, Env, Symbol, Vec};
 
 #[contracttype]

@@ -331,6 +331,10 @@ impl Pausable for TenantReputation {
         access_control::require_admin_permission(&env, &get_admin(&env), &admin, "unpause")
             .map_err(|_| PausableError::NotAuthorized)?;
         env.storage().instance().set(&DataKey::Paused, &false);
+        env.events().publish(
+            (Symbol::new(&env, "Pausable"), Symbol::new(&env, "unpause")),
+            (),
+        );
         Ok(())
     }
 
@@ -1697,7 +1701,7 @@ mod test {
     }
 
     #[test]
-    fn pause_emits_event_and_unpause_does_not() {
+    fn pause_and_unpause_both_emit_events() {
         let env = Env::default();
         let (cid, client, admin, _operator) = setup(&env);
 
@@ -1711,7 +1715,11 @@ mod test {
 
         m_unpause(&env, &cid, &admin);
         client.try_unpause(&admin).unwrap().unwrap();
-        assert!(env.events().all().is_empty(), "unpause emits no event");
+        let topics = last_topics(&env);
+        let cat: Symbol = topics.get(0).unwrap().try_into_val(&env).unwrap();
+        let action: Symbol = topics.get(1).unwrap().try_into_val(&env).unwrap();
+        assert_eq!(cat, Symbol::new(&env, "Pausable"));
+        assert_eq!(action, Symbol::new(&env, "unpause"));
     }
 
     /// Contrast rent_schedule::init (which emits a `rent_schedule/init`

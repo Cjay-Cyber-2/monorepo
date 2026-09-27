@@ -1,5 +1,8 @@
 #![no_std]
 
+#[cfg(kani)]
+mod formal_properties;
+
 use soroban_sdk::{contract, contracterror, contractimpl, contracttype, Address, Env, Symbol, Vec};
 
 // ── Storage Keys ─────────────────────────────────────────────────────────────
