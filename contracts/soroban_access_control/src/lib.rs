@@ -6,18 +6,18 @@ use soroban_sdk::{contract, contracterror, contractimpl, contracttype, Address, 
 mod formal_properties;
 
 /// Extends the TTL (time-to-live) of a persistent storage entry.
-/// 
+///
 /// On Soroban, persistent storage entries have a limited lifetime based on the ledger TTL.
 /// If entries are never extended, they eventually get archived or expire, causing reads to fail.
 /// This helper should be called after writing to persistent storage to ensure the entry remains accessible.
-/// 
+///
 /// The standard approach is to extend TTL on every write to a persistent key, which is
 /// the simplest and most robust method to ensure data remains accessible.
-/// 
+///
 /// # Arguments
 /// * `env` - The environment
 /// * `key` - The storage key to extend TTL for
-/// 
+///
 /// # Example
 /// ```ignore
 /// env.storage().persistent().set(&key, &value);

@@ -31,7 +31,7 @@ fn verify_fund_custody_consistency() {
         admin.clone(),
         token.clone(),
         receipt_contract.clone(),
-        86400, // 24h challenge window
+        86400,  // 24h challenge window
         172800, // 48h dispute timeout
     )
     .unwrap();
@@ -41,17 +41,16 @@ fn verify_fund_custody_consistency() {
 
     // Set initial balance
     let initial_balance = 1000i128;
-    env.storage()
-        .persistent()
-        .set(&DataKey::DealBalance(deal_id.into_val(&env)), &initial_balance);
+    env.storage().persistent().set(
+        &DataKey::DealBalance(deal_id.into_val(&env)),
+        &initial_balance,
+    );
 
     // Set deal state to active
-    env.storage()
-        .persistent()
-        .set(
-            &DataKey::DealState(deal_id.into_val(&env)),
-            &DealLifecycleStatus::Active,
-        );
+    env.storage().persistent().set(
+        &DataKey::DealState(deal_id.into_val(&env)),
+        &DealLifecycleStatus::Active,
+    );
 
     // Property: Retrieved balance should match set balance
     let retrieved_balance = env
@@ -66,7 +65,10 @@ fn verify_fund_custody_consistency() {
     );
 
     // Property: Balance should be non-negative
-    assert!(retrieved_balance >= 0, "Escrowed balance should never be negative");
+    assert!(
+        retrieved_balance >= 0,
+        "Escrowed balance should never be negative"
+    );
 }
 
 /// Circuit Breaker Mutual Exclusion Property:
@@ -100,7 +102,10 @@ fn verify_circuit_breaker_mutual_exclusion() {
         .instance()
         .get::<DataKey, u32>(&DataKey::CircuitBreakerState)
         .unwrap_or(0);
-    assert_eq!(initial_state, 0, "Initial circuit breaker state should be inactive");
+    assert_eq!(
+        initial_state, 0,
+        "Initial circuit breaker state should be inactive"
+    );
 
     // Simulate circuit breaker activation
     env.storage()
@@ -151,12 +156,10 @@ fn verify_dispute_state_transitions() {
     let deal_id = "test_deal_002";
 
     // Set deal to active state
-    env.storage()
-        .persistent()
-        .set(
-            &DataKey::DealState(deal_id.into_val(&env)),
-            &DealLifecycleStatus::Active,
-        );
+    env.storage().persistent().set(
+        &DataKey::DealState(deal_id.into_val(&env)),
+        &DealLifecycleStatus::Active,
+    );
 
     // Property: Deal should be in active state
     let deal_state = env
@@ -166,17 +169,16 @@ fn verify_dispute_state_transitions() {
         .unwrap_or(DealLifecycleStatus::Draft);
 
     assert_eq!(
-        deal_state, DealLifecycleStatus::Active,
+        deal_state,
+        DealLifecycleStatus::Active,
         "Deal should be in active state"
     );
 
     // Simulate transition to completed state
-    env.storage()
-        .persistent()
-        .set(
-            &DataKey::DealState(deal_id.into_val(&env)),
-            &DealLifecycleStatus::Completed,
-        );
+    env.storage().persistent().set(
+        &DataKey::DealState(deal_id.into_val(&env)),
+        &DealLifecycleStatus::Completed,
+    );
 
     // Property: Deal should be in completed state after transition
     let completed_state = env
@@ -186,13 +188,15 @@ fn verify_dispute_state_transitions() {
         .unwrap_or(DealLifecycleStatus::Draft);
 
     assert_eq!(
-        completed_state, DealLifecycleStatus::Completed,
+        completed_state,
+        DealLifecycleStatus::Completed,
         "Deal should be in completed state after transition"
     );
 
     // Property: State transitions are irreversible for completed deals
     assert_neq!(
-        completed_state, DealLifecycleStatus::Active,
+        completed_state,
+        DealLifecycleStatus::Active,
         "Completed deals should not transition back to active"
     );
 }
