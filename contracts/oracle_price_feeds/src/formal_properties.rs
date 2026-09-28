@@ -265,7 +265,6 @@ fn verify_fresh_price_readable() {
     );
 }
 
-
 #[kani::proof]
 fn verify_stale_price_rejected() {
     let env = Env::default();
@@ -289,11 +288,17 @@ fn verify_stale_price_rejected() {
     let price: i128 = kani::any();
     kani::assume(price > 0 && price < 1_000_000_000i128);
 
-    client.try_init(&admin, &operator, &max_stale_secs, &500u64).unwrap().unwrap();
+    client
+        .try_init(&admin, &operator, &max_stale_secs, &500u64)
+        .unwrap()
+        .unwrap();
 
     env.ledger().set_timestamp(initial_time);
     let update_timestamp = initial_time + update_delta;
-    client.try_update_price(&operator, &pair, &price, &update_timestamp).unwrap().unwrap();
+    client
+        .try_update_price(&operator, &pair, &price, &update_timestamp)
+        .unwrap()
+        .unwrap();
 
     // Query time strictly greater than staleness threshold
     let query_time = update_timestamp + max_stale_secs + 1;
@@ -301,5 +306,8 @@ fn verify_stale_price_rejected() {
     env.ledger().set_timestamp(query_time);
 
     let result = client.try_get_price(&pair);
-    assert!(result.is_err(), "get_price must fail on stale feed across all symbolic ranges");
+    assert!(
+        result.is_err(),
+        "get_price must fail on stale feed across all symbolic ranges"
+    );
 }
