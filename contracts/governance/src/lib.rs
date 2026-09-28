@@ -1323,3 +1323,31 @@ mod tests {
         assert_eq!(ev_pid, pid);
     }
 }
+
+
+// contracts/governance/src/lib.rs
+
+// Assuming a typed error variant exists or needs to be added, e.g., Error::NegativeStake
+// Make sure Error::NegativeStake is defined in your error enum.
+
+pub fn set_total_staked(env: Env, amount: i128) -> Result<(), Error> {
+    // Reject negative stake amounts
+    if amount < 0 {
+        return Err(Error::NegativeStake);
+    }
+    
+    // Existing logic for setting total staked...
+    storage::set_total_staked(&env, &amount);
+    Ok(())
+}
+
+pub fn set_voter_stake(env: Env, voter: Address, amount: i128) -> Result<(), Error> {
+    // Reject negative stake amounts
+    if amount < 0 {
+        return Err(Error::NegativeStake);
+    }
+
+    // Existing logic for setting voter stake...
+    storage::set_voter_stake(&env, &voter, &amount);
+    Ok(())
+}
