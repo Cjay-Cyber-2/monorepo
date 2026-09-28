@@ -264,3 +264,42 @@ fn verify_fresh_price_readable() {
         "feed must not be stale immediately after update"
     );
 }
+
+
+#[kani::proof]
+fn verify_stale_price_rejected() {
+    let env = Env::default();
+    let contract_id = env.register(OracleContract, ());
+    let client = OracleContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let operator = Address::generate(&env);
+    let pair = Symbol::new(&env, "BTC");
+
+    // Symbolic inputs for thresholds and timestamps
+    let max_stale_secs: u64 = kani::any();
+    kani::assume(max_stale_secs > 0 && max_stale_secs <= 86400);
+
+    let initial_time: u64 = kani::any();
+    kani::assume(initial_time > 1000 && initial_time < u64::MAX / 4);
+
+    let update_delta: u64 = kani::any();
+    kani::assume(update_delta > 0 && update_delta < 100_000);
+
+    let price: i128 = kani::any();
+    kani::assume(price > 0 && price < 1_000_000_000i128);
+
+    client.try_init(&admin, &operator, &max_stale_secs, &500u64).unwrap().unwrap();
+
+    env.ledger().set_timestamp(initial_time);
+    let update_timestamp = initial_time + update_delta;
+    client.try_update_price(&operator, &pair, &price, &update_timestamp).unwrap().unwrap();
+
+    // Query time strictly greater than staleness threshold
+    let query_time = update_timestamp + max_stale_secs + 1;
+    kani::assume(query_time > update_timestamp);
+    env.ledger().set_timestamp(query_time);
+
+    let result = client.try_get_price(&pair);
+    assert!(result.is_err(), "get_price must fail on stale feed across all symbolic ranges");
+}
