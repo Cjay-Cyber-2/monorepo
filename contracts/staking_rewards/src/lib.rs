@@ -1,9 +1,9 @@
 #![no_std]
+use soroban_access_control::extend_storage_ttl;
 use soroban_pausable::{Pausable, PausableError};
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, Address, BytesN, Env, IntoVal, Symbol,
 };
-use soroban_access_control::extend_storage_ttl;
 
 #[cfg(kani)]
 pub mod formal_properties;
