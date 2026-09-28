@@ -234,7 +234,10 @@ import { createCircuitBreakerRouter } from "./routes/circuitBreaker.js";
 import { initFraudStore, PostgresFraudStore } from "./fraud/index.js";
 import { createAdminFraudRouter } from "./routes/adminFraud.js";
 import { createAdminOutboxRouter } from "./routes/adminOutbox.js";
-import { initializeCacheInvalidationWebhooks } from "./services/cacheInvalidation.js";
+import {
+  cacheInvalidationService,
+  initializeCacheInvalidationWebhooks,
+} from "./services/cacheInvalidation.js";
 import { createKycWebhookRouter } from "./routes/kyc.js";
 import { createOnboardingRouter } from "./routes/onboarding.js";
 import { createEmployersRouter } from "./routes/employers.js";
@@ -658,6 +661,9 @@ export function createApp() {
       // Stop secret rotation watcher
       const secretRotationService = getSecretRotationService();
       secretRotationService.stopWatching();
+
+      // Stop the cache invalidation flush interval
+      cacheInvalidationService.stop();
 
       // Stop all workers
       await Promise.all(workers.map((w) => w.stop()));

@@ -12,6 +12,9 @@ use soroban_sdk::{
 pub mod access_control;
 pub mod validation;
 
+#[cfg(kani)]
+pub mod formal_properties;
+
 #[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
