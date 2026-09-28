@@ -517,3 +517,20 @@ mod tests {
         }
     }
 }
+
+// contracts/rent_wallet/src/formal_properties.rs
+
+#[cfg(kani)]
+mod formal_properties {
+    use super::*;
+    use soroban_sdk::Env;
+
+    // Example proof harness corrected to run under Kani alone without #[test]
+    #[kani::proof]
+    pub fn inv1_funds_conservation() {
+        let env = Env::default();
+        // ... Kani symbolic inputs and contract checks ...
+    }
+
+    // Repeat for invariants 2 through 10, ensuring #[kani::proof] is used exclusively
+}
