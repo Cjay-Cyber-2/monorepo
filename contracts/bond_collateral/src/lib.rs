@@ -1980,3 +1980,13 @@ mod additional_coverage_tests {
         assert_eq!(client.get_keeper_reward_cap(), 1000u32);
     }
 }
+
+
+mod storage;
+
+#[cfg(kani)]
+mod formal_properties;
+
+@contract
+pub struct BondCollateralContract;
+// ...
