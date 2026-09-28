@@ -126,7 +126,7 @@ export default function WhistleblowerDashboard() {
       />
 
       {/* Main Content */}
-      <main id="main-content"
+      <main
         id={DASHBOARD_MAIN_ID}
         tabIndex={-1}
         className="min-h-screen pt-20 lg:ml-64"

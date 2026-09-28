@@ -50,6 +50,7 @@ pub enum ContractError {
     ProposalNotPassed = 9,
     ProposalAlreadyExecuted = 10,
     QuorumNotReached = 11,
+    NegativeStake = 12,
 }
 
 // ── Data Structures ───────────────────────────────────────────────────────────
@@ -146,6 +147,9 @@ impl Governance {
     /// Admin updates total staked (mirrors staking pool state for quorum).
     pub fn set_total_staked(env: Env, admin: Address, total: i128) -> Result<(), ContractError> {
         require_admin(&env, &admin)?;
+        if total < 0 {
+            return Err(ContractError::NegativeStake);
+        }
         env.storage().instance().set(&DataKey::TotalStaked, &total);
         Ok(())
     }
@@ -158,6 +162,9 @@ impl Governance {
         stake: i128,
     ) -> Result<(), ContractError> {
         require_admin(&env, &admin)?;
+        if stake < 0 {
+            return Err(ContractError::NegativeStake);
+        }
         // Reuse Voted(0, voter) as a stake-weight slot (proposal 0 is never created)
         env.storage()
             .persistent()
@@ -786,6 +793,25 @@ mod tests {
         assert_eq!(result.unwrap_err().unwrap(), ContractError::NotAuthorized);
     }
 
+    #[test]
+    fn set_total_staked_rejects_negative_amount() {
+        let env = Env::default();
+        let (admin, client) = setup(&env, 1_000_000);
+
+        let result = client.try_set_total_staked(&admin, &-1);
+        assert_eq!(result.unwrap_err().unwrap(), ContractError::NegativeStake);
+    }
+
+    #[test]
+    fn set_voter_stake_rejects_negative_amount() {
+        let env = Env::default();
+        let (admin, client) = setup(&env, 1_000_000);
+
+        let voter = Address::generate(&env);
+        let result = client.try_set_voter_stake(&admin, &voter, &-1);
+        assert_eq!(result.unwrap_err().unwrap(), ContractError::NegativeStake);
+    }
+
     // --- Initialization edge cases -----------------------------------------
 
     #[test]
@@ -1322,32 +1348,4 @@ mod tests {
         let ev_pid: u64 = data.try_into_val(&env).unwrap();
         assert_eq!(ev_pid, pid);
     }
-}
-
-
-// contracts/governance/src/lib.rs
-
-// Assuming a typed error variant exists or needs to be added, e.g., Error::NegativeStake
-// Make sure Error::NegativeStake is defined in your error enum.
-
-pub fn set_total_staked(env: Env, amount: i128) -> Result<(), Error> {
-    // Reject negative stake amounts
-    if amount < 0 {
-        return Err(Error::NegativeStake);
-    }
-    
-    // Existing logic for setting total staked...
-    storage::set_total_staked(&env, &amount);
-    Ok(())
-}
-
-pub fn set_voter_stake(env: Env, voter: Address, amount: i128) -> Result<(), Error> {
-    // Reject negative stake amounts
-    if amount < 0 {
-        return Err(Error::NegativeStake);
-    }
-
-    // Existing logic for setting voter stake...
-    storage::set_voter_stake(&env, &voter, &amount);
-    Ok(())
 }

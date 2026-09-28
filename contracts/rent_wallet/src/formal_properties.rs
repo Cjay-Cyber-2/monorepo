@@ -549,7 +549,7 @@ mod formal_properties {
         let operator = Address::generate(&env);
         let contract_id = env.register(TransactionReceiptContract, ());
         let client = TransactionReceiptContractClient::new(&env, &contract_id);
-        
+
         client.init(&admin, &operator);
 
         // Symbolic or concrete test inputs for issuing a receipt
