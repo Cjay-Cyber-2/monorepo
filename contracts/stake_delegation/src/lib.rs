@@ -365,7 +365,11 @@ impl StakeDelegation {
                 if d.delegatee == delegatee {
                     // Proportional reduction: new_amount = d.amount * new_stake / old_stake
                     let new_amount = if delegatee_stake > 0 {
-                        d.amount * new_delegatee_stake / delegatee_stake
+                        d.amount
+                            .checked_mul(new_delegatee_stake)
+                            .unwrap_or(0)
+                            .checked_div(delegatee_stake)
+                            .unwrap_or(0)
                     } else {
                         0
                     };
@@ -1040,7 +1044,15 @@ impl StakeDelegation {
         let delegatee_stake = Self::get_delegatee_stake(env, addr);
         let delegatee_index = Self::get_delegatee_index(env, addr);
         if delegatee_stake > 0 && current_reward_index > delegatee_index {
-            let gross = delegatee_stake * (current_reward_index - delegatee_index) / SCALE;
+            let gross = delegatee_stake
+                .checked_mul(
+                    current_reward_index
+                        .checked_sub(delegatee_index)
+                        .unwrap_or(0),
+                )
+                .unwrap_or(0)
+                .checked_div(SCALE)
+                .unwrap_or(0);
             if gross > 0 {
                 let commission_rate: u32 = env
                     .storage()

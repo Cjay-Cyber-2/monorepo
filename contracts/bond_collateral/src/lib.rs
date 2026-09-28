@@ -601,7 +601,7 @@ impl BondCollateral {
         let token_client = token::Client::new(&env, &token_address);
         token_client.transfer(&env.current_contract_address(), &owner, &amount);
 
-        let total = get_total_collateral(&env) - amount;
+        let total = get_total_collateral(&env).saturating_sub(amount);
         put_total_collateral(&env, total);
 
         // Emit collateral_withdrawn with the resulting ratio
@@ -681,11 +681,21 @@ impl BondCollateral {
         let seize_amount = raw_seize.max(1).min(collateral);
 
         // Bond debt retired is proportional to the oracle value of seized collateral.
-        let bond_reduction = (seize_amount * effective_price / PRICE_SCALE).min(bond);
+        let bond_reduction = seize_amount
+            .checked_mul(effective_price)
+            .unwrap_or(0)
+            .checked_div(PRICE_SCALE)
+            .unwrap_or(0)
+            .min(bond);
 
         // Keeper reward bounded by reward cap bps of seized collateral.
         let reward_cap = get_keeper_reward_cap(&env);
-        let keeper_reward = (seize_amount * reward_cap as i128 / 10_000).min(seize_amount);
+        let keeper_reward = seize_amount
+            .checked_mul(reward_cap as i128)
+            .unwrap_or(0)
+            .checked_div(10_000)
+            .unwrap_or(0)
+            .min(seize_amount);
 
         // Update position accounting.
         let new_collateral = collateral - seize_amount;
