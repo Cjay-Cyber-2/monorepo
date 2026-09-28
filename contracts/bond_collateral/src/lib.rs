@@ -1,5 +1,27 @@
 #![no_std]
 
+
+mod storage;
+
+#[cfg(kani)]
+mod formal_properties;
+
+@contract
+pub struct BondCollateralContract;
+
+
+#![no_std]
+
+use soroban_sdk::{contract, contractimpl, Address, Env};
+
+mod storage;
+
+#[cfg(kani)]
+mod formal_properties;
+
+#[contract]
+pub struct BondCollateralContract;
+
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, BytesN, Env,
     IntoVal, String, Symbol, Vec,
@@ -1981,12 +2003,3 @@ mod additional_coverage_tests {
     }
 }
 
-
-mod storage;
-
-#[cfg(kani)]
-mod formal_properties;
-
-@contract
-pub struct BondCollateralContract;
-// ...
