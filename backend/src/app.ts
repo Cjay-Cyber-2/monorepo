@@ -247,6 +247,7 @@ import {
   sendQueuedMessageNotificationEmail,
 } from "./services/messageNotificationService.js";
 import { createAttachmentsRouter } from "./routes/attachments.js";
+import { getStorageProvider } from "./services/storageService.js";
 import { MonthlyDeductionReminderJob } from "./jobs/monthlyDeductionReminderJob.js";
 import {
   dataRetentionPurgeJobHandler,
@@ -1223,7 +1224,7 @@ export function createApp() {
 
   // Interactive API documentation
   app.use("/api/v1/messaging", createMessagingRouter());
-  app.use("/api/v1/messaging/attachments", createAttachmentsRouter());
+  app.use("/api/v1/messaging/attachments", createAttachmentsRouter(getStorageProvider()));
   app.use("/docs", createDocsRouter());
 
   // Backward compatibility redirect from /api/* to /api/v1/*
