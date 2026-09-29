@@ -367,6 +367,7 @@ impl StakingPool {
             return Err(ContractError::AlreadyInitialized);
         }
 
+        admin.require_auth();
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Token, &token);
         env.storage()
@@ -932,6 +933,7 @@ mod test {
     }
 
     fn setup_contract(env: &Env) -> (Address, StakingPoolClient<'_>, Address, Address, Address) {
+        env.mock_all_auths();
         let contract_id = env.register(StakingPool, ());
         let client = StakingPoolClient::new(env, &contract_id);
 
@@ -1011,6 +1013,7 @@ mod test {
     #[test]
     fn init_sets_admin_and_token() {
         let env = Env::default();
+        env.mock_all_auths();
         let contract_id = env.register(StakingPool, ());
         let client = StakingPoolClient::new(&env, &contract_id);
 
@@ -1043,6 +1046,7 @@ mod test {
     #[test]
     fn version_matches_contract_version() {
         let env = Env::default();
+        env.mock_all_auths();
         let contract_id = env.register(StakingPool, ());
         let client = StakingPoolClient::new(&env, &contract_id);
 
@@ -1063,6 +1067,7 @@ mod test {
     #[test]
     fn init_cannot_be_called_twice() {
         let env = Env::default();
+        env.mock_all_auths();
         let contract_id = env.register(StakingPool, ());
         let client = StakingPoolClient::new(&env, &contract_id);
 
@@ -1080,6 +1085,20 @@ mod test {
             .unwrap_err()
             .unwrap();
         assert_eq!(err, ContractError::AlreadyInitialized);
+    }
+
+    #[test]
+    #[should_panic]
+    fn init_requires_admin_auth() {
+        let env = Env::default();
+        let contract_id = env.register(StakingPool, ());
+        let client = StakingPoolClient::new(&env, &contract_id);
+        let admin = Address::generate(&env);
+        let token_id = env
+            .register_stellar_asset_contract_v2(Address::generate(&env))
+            .address();
+
+        client.init(&admin, &token_id);
     }
 
     // ============================================================================
