@@ -584,13 +584,12 @@ impl StakingRewards {
         if admin != stored_admin {
             return Err(ContractError::NotAuthorized);
         }
-        if let Some(guardian) = env
+        let guardian = env
             .storage()
             .instance()
             .get::<_, Address>(&StorageKey::Guardian)
-        {
-            guardian.require_auth();
-        }
+            .ok_or(ContractError::NotAuthorized)?;
+        guardian.require_auth();
         env.storage()
             .instance()
             .remove(&StorageKey::PendingUpgradeHash);
