@@ -34,6 +34,8 @@ import {
 } from "../models/webhookSubscription.js";
 import { getWebhookReplayStore } from "../webhookReplay/store.js";
 import { WebhookProcessingStatus } from "../webhookReplay/types.js";
+import { validateUrlForSSRF, revalidateUrlForSSRF } from "../utils/ssrfProtection.js";
+import rateLimit from "express-rate-limit";
 
 function extractWebhookHeaders(req: Request): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -49,6 +51,19 @@ export function createWebhooksRouter(ngnWalletService: NgnWalletService) {
   const router = Router();
   const adapter = createSorobanAdapter(getSorobanConfigFromEnv(process.env));
   const sender = new OutboxSender(adapter);
+
+  // Rate limit for webhook subscription creation
+  const subscriptionRateLimit = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // 10 subscriptions per 15 minutes per user
+    keyGenerator: (req) => {
+      const authReq = req as AuthenticatedRequest;
+      return authReq.user?.id || 'anonymous';
+    },
+    message: 'Too many webhook subscription requests, please try again later',
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
 
   /**
    * POST /api/webhooks/payments/:rail
@@ -484,6 +499,7 @@ export function createWebhooksRouter(ngnWalletService: NgnWalletService) {
   router.post(
     "/subscriptions",
     authenticateToken,
+    subscriptionRateLimit,
     async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
       try {
         const userId = req.user?.id;
@@ -493,8 +509,11 @@ export function createWebhooksRouter(ngnWalletService: NgnWalletService) {
 
         const { targetUrl, events } = subscriptionSchema.parse(req.body);
 
-        if (!targetUrl.startsWith("https://")) {
-          throw new AppError(ErrorCode.VALIDATION_ERROR, 400, "Target URL must use HTTPS protocol");
+        // SSRF protection: validate URL doesn't point to private/internal IPs
+        try {
+          validateUrlForSSRF(targetUrl);
+        } catch (ssrfError) {
+          throw new AppError(ErrorCode.VALIDATION_ERROR, 400, ssrfError instanceof Error ? ssrfError.message : 'Invalid URL');
         }
 
         const plainSecret = `whsec_${generateRandomSecretHex(24)}`;

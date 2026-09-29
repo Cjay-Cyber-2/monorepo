@@ -6,6 +6,7 @@ import {
   webhookDeliveryStore,
 } from '../models/webhookSubscription.js'
 import { logger } from '../utils/logger.js'
+import { revalidateUrlForSSRF } from '../utils/ssrfProtection.js'
 
 const MAX_DELIVERY_ATTEMPTS = 5
 const DELIVERY_TIMEOUT_MS = parseInt(process.env.WEBHOOK_DELIVERY_TIMEOUT_MS ?? '10000', 10)
@@ -59,6 +60,25 @@ export async function processWebhookDeliveryJob(jobPayload: {
   const { subscriptionId, event, payload, attemptCount, requestId } = jobPayload
   const sub = await webhookSubscriptionStore.findById(subscriptionId)
   if (!sub || !sub.active) {
+    return
+  }
+
+  // Revalidate URL for SSRF protection at delivery time
+  if (!revalidateUrlForSSRF(sub.targetUrl)) {
+    logger.warn('Webhook delivery blocked due to SSRF protection', {
+      subscriptionId,
+      targetUrl: sub.targetUrl,
+      requestId,
+    })
+    await webhookDeliveryStore.logAttempt({
+      subscriptionId,
+      event,
+      payload,
+      status: 'permanently_failed',
+      responseCode: 403,
+      responseBody: 'URL blocked by SSRF protection',
+      requestId,
+    })
     return
   }
 
