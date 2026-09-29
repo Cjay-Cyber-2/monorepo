@@ -96,6 +96,7 @@ impl AllowlistRegistry {
         if env.storage().instance().has(&DataKey::Admin) {
             return Err(Error::AlreadyInitialized);
         }
+        admin.require_auth();
         env.storage().instance().set(&DataKey::Admin, &admin);
         Ok(())
     }
@@ -246,6 +247,17 @@ mod tests {
         env.mock_all_auths();
         client.initialize(&admin);
         (client, admin)
+    }
+
+    #[test]
+    #[should_panic]
+    fn initialize_requires_admin_auth() {
+        let env = Env::default();
+        let id = env.register(AllowlistRegistry, ());
+        let client = AllowlistRegistryClient::new(&env, &id);
+        let admin = Address::generate(&env);
+
+        client.initialize(&admin);
     }
 
     #[test]

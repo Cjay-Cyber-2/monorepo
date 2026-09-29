@@ -29,6 +29,7 @@ mod tests {
     }
 
     fn setup(env: &Env) -> (Address, TimelockClient<'_>, Address, Address) {
+        env.mock_all_auths();
         let timelock_id = env.register(Timelock, ());
         let client = TimelockClient::new(env, &timelock_id);
         let admin = Address::generate(env);
@@ -38,6 +39,19 @@ mod tests {
         members.push_back(member.clone());
         client.init(&admin, &3600u64, &604800u64, &members);
         (timelock_id, client, admin, member)
+    }
+
+    #[test]
+    #[should_panic]
+    fn init_requires_admin_auth() {
+        let env = Env::default();
+        let id = env.register(Timelock, ());
+        let client = TimelockClient::new(&env, &id);
+        let admin = Address::generate(&env);
+        let member = Address::generate(&env);
+        let members = Vec::from_array(&env, [member]);
+
+        client.init(&admin, &3600u64, &604800u64, &members);
     }
 
     fn queue_op(
