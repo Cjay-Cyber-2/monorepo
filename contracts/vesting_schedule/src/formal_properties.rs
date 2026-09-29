@@ -40,7 +40,10 @@ fn verify_vested_amount_bounded() {
 
     let vested = calculate_vested_amount(&schedule, current_time);
     assert!(vested >= 0, "vested must be >= 0");
-    assert!(vested <= total_amount, "vested must not exceed total_amount");
+    assert!(
+        vested <= total_amount,
+        "vested must not exceed total_amount"
+    );
 }
 
 /// **Proof 2 — claimed_amount never exceeds total_amount**

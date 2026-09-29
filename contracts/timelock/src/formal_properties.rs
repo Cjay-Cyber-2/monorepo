@@ -26,14 +26,8 @@ fn init_timelock(env: &Env, min_delay: u64, max_delay: u64) -> Address {
     members.push_back(Address::generate(env));
 
     env.mock_all_auths();
-    Timelock::init(
-        env.clone(),
-        admin.clone(),
-        min_delay,
-        max_delay,
-        members,
-    )
-    .expect("init must succeed with valid delays");
+    Timelock::init(env.clone(), admin.clone(), min_delay, max_delay, members)
+        .expect("init must succeed with valid delays");
     admin
 }
 
@@ -71,14 +65,7 @@ fn verify_queue_enforces_min_delay() {
     let function = soroban_sdk::Symbol::new(&env, "noop");
     let args = soroban_sdk::Vec::new(&env);
 
-    let result = Timelock::queue(
-        env.clone(),
-        admin,
-        target,
-        function,
-        args,
-        under_delay,
-    );
+    let result = Timelock::queue(env.clone(), admin, target, function, args, under_delay);
 
     assert!(
         matches!(result, Err(TimelockError::InvalidDelay)),
@@ -131,8 +118,7 @@ fn verify_grace_period_boundary() {
     // Verify the constant value matches the documented 14-day invariant.
     let expected_14_days: u64 = 14 * 24 * 3600;
     assert_eq!(
-        GRACE_PERIOD,
-        expected_14_days,
+        GRACE_PERIOD, expected_14_days,
         "GRACE_PERIOD must be 14 days (1_209_600 s)"
     );
 }
@@ -175,14 +161,7 @@ fn verify_only_admin_can_queue() {
     let function = soroban_sdk::Symbol::new(&env, "noop");
     let args = soroban_sdk::Vec::new(&env);
 
-    let result = Timelock::queue(
-        env.clone(),
-        outsider,
-        target,
-        function,
-        args,
-        min_delay,
-    );
+    let result = Timelock::queue(env.clone(), outsider, target, function, args, min_delay);
 
     assert!(
         matches!(result, Err(TimelockError::NotAuthorized)),

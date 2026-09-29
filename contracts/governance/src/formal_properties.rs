@@ -37,22 +37,19 @@ fn init_governance(env: &Env, total_staked: i128) -> (Address, crate::Governance
 }
 
 /// Give `voter` exactly `stake` tokens by calling `set_voter_stake` (admin fn).
-fn give_stake(env: &Env, client: &crate::GovernanceClient<'_>, admin: &Address, voter: &Address, stake: i128) {
+fn give_stake(
+    env: &Env,
+    client: &crate::GovernanceClient<'_>,
+    admin: &Address,
+    voter: &Address,
+    stake: i128,
+) {
     client.set_voter_stake(admin, voter, &stake);
 }
 
 /// Create a proposal through the contract and return its id.
-fn create_proposal(
-    client: &crate::GovernanceClient<'_>,
-    proposer: &Address,
-    env: &Env,
-) -> u64 {
-    client.create_proposal(
-        proposer,
-        &Symbol::new(env, "param"),
-        &100i128,
-        &200i128,
-    )
+fn create_proposal(client: &crate::GovernanceClient<'_>, proposer: &Address, env: &Env) -> u64 {
+    client.create_proposal(proposer, &Symbol::new(env, "param"), &100i128, &200i128)
 }
 
 // ── proofs ────────────────────────────────────────────────────────────────────
