@@ -319,6 +319,19 @@ impl MultisigAdmin {
         if (approvals.len() as u32) < cfg.threshold {
             return Err(MultisigError::NotEnoughApprovals);
         }
+
+        // Findings & Reasoning on Unresolved Operation Types:
+        // A review of the codebase reveals that `multisig_admin` is a standalone contract with zero
+        // dependencies on other contracts (e.g., no escrow, slashing, oracle, or token contracts exist
+        // in this repository). There are no deployment scripts, configuration addresses, or ABI definitions
+        // specifying which target contracts `ForceReleaseEscrow`, `ExecuteSlash`, `UpgradeContract`,
+        // `SetOracleStaleness`, `FreezeAccount`, or `UpdateUpgradeDelay` are supposed to invoke.
+        // Attempting to perform cross-contract invocation without known target addresses, methods, or argument
+        // serialization formats would result in arbitrary/guesswork bindings that cannot be tested against
+        // real contracts in this workspace. Therefore, cross-contract dispatch for all 6 operation types
+        // remains unresolvable from the current repository contents and is left as follow-up work once target
+        // contract specifications are defined.
+
         prop.status = ProposalStatus::Executed;
         env.storage()
             .instance()
