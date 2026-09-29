@@ -28,7 +28,7 @@ export async function enqueueDelivery(
   payload: Record<string, unknown>,
   options?: { requestId?: string }
 ): Promise<void> {
-  const activeSubs = webhookSubscriptionStore.listActiveByEvent(event)
+  const activeSubs = await webhookSubscriptionStore.listActiveByEvent(event)
   const scheduler = getScheduler()
 
   for (const sub of activeSubs) {
@@ -57,7 +57,7 @@ export async function processWebhookDeliveryJob(jobPayload: {
   requestId?: string
 }): Promise<void> {
   const { subscriptionId, event, payload, attemptCount, requestId } = jobPayload
-  const sub = webhookSubscriptionStore.findById(subscriptionId)
+  const sub = await webhookSubscriptionStore.findById(subscriptionId)
   if (!sub || !sub.active) {
     return
   }
@@ -94,7 +94,7 @@ export async function processWebhookDeliveryJob(jobPayload: {
 
   const truncatedBody = responseBody.slice(0, 500)
 
-  webhookDeliveryStore.logAttempt({
+  await webhookDeliveryStore.logAttempt({
     subscriptionId,
     event,
     payload,
