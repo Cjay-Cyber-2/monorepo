@@ -24,7 +24,7 @@
 
 use soroban_sdk::Address;
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, BytesN, Env, Map, String, Symbol,
+    contract, contracterror, contractimpl, contracttype, Address, BytesN, Env, Map, String, Symbol,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

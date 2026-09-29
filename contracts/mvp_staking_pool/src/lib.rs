@@ -1,5 +1,8 @@
 #![no_std]
 
+#[cfg(kani)]
+mod formal_properties;
+
 use soroban_pausable::{Pausable, PausableError};
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, token::Client as TokenClient, Address,
