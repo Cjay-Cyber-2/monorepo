@@ -731,12 +731,6 @@ export function createApp() {
     }),
   );
 
-  // Core administrative routes
-  app.use(
-    "/api/admin/timelock",
-    adminTimelockRouter(sorobanAdapter as any, timelockRepo),
-  );
-
   app.use(
     cors({
       origin: env.CORS_ORIGINS.split(",").map((s: string) => s.trim()),
@@ -830,6 +824,10 @@ export function createApp() {
   app.use("/api/v1/admin/jobs", createAdminJobsRouter());
   app.use("/api/v1/admin/quota", createAdminQuotaRouter());
   app.use("/api/v1/admin/webhook-replay", createWebhookReplayRouter());
+  app.use(
+    "/api/v1/admin/timelock",
+    adminTimelockRouter(sorobanAdapter as any, timelockRepo),
+  );
   app.use("/api/v1/deals", createDealsRouter());
   app.use("/api/v1/whistleblower", createWhistleblowerRouter(earningsService));
   app.use(
