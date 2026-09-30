@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { formatDate } from "@/lib/date";
 import {
   Dialog,
   DialogContent,
@@ -212,7 +213,7 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <main className="min-h-screen bg-background py-12">
+    <main id="main-content" className="min-h-screen bg-background py-12">
       <div className="container mx-auto px-4">
         <div className="mb-8">
           <h1 className="font-mono text-4xl font-black mb-2">User Management</h1>
@@ -365,7 +366,7 @@ export default function AdminUsersPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {new Date(user.joinedDate).toLocaleDateString("en-NG")}
+                        {formatDate(user.joinedDate)}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">

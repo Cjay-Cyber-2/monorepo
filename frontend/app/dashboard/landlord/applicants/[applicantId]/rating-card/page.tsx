@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getRatingCard, type PublicRatingCard } from "@/lib/ratingCardApi";
 import { StarRating } from "@/components/tenant/RatingDimension";
+import { formatDate } from "@/lib/date";
 import RatingCard from "@/components/tenant/RatingCard";
 
 export default function LandlordRatingCardPage() {
@@ -29,17 +30,9 @@ export default function LandlordRatingCardPage() {
       .finally(() => setIsLoading(false));
   }, [applicantId]);
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("en-NG", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-background flex items-center justify-center">
+      <main id="main-content" className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-foreground border-t-transparent mx-auto" />
           <p className="mt-4 text-muted-foreground">Loading rating card...</p>
@@ -50,7 +43,7 @@ export default function LandlordRatingCardPage() {
 
   if (!hasAccess || !card) {
     return (
-      <main className="min-h-screen bg-background flex items-center justify-center">
+      <main id="main-content" className="min-h-screen bg-background flex items-center justify-center">
         <Card className="border-3 border-foreground p-12 shadow-[6px_6px_0px_0px_rgba(26,26,26,1)] text-center max-w-md">
           <ShieldAlert className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
           <h1 className="font-mono text-2xl font-black mb-2">Access Denied</h1>
@@ -69,7 +62,7 @@ export default function LandlordRatingCardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background">
+    <main id="main-content" className="min-h-screen bg-background">
       <div className="border-b-3 border-foreground bg-muted">
         <div className="container mx-auto px-4 py-4">
           <Link

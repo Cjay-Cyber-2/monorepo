@@ -48,6 +48,8 @@ function PropertiesContent() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
   const [searchQuery, setSearchQuery] = useState(
     searchParams.get("query") || "",
   );
@@ -115,6 +117,7 @@ function PropertiesContent() {
 
   const clearAllFilters = () => {
     setSearchQuery("");
+    setHasError(false);
     router.push("/properties");
   };
 
@@ -128,42 +131,64 @@ function PropertiesContent() {
     minAnnualRent ||
     maxAnnualRent;
 
-  const fetchProperties = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const filters: PropertySearchFilters = {
-        sortBy: (sortBy as PropertySearchFilters["sortBy"]) || "newest",
-        page,
-        pageSize: 20,
-      };
+  useEffect(() => {
+    let cancelled = false;
+    startPropertyDiscovery("anonymous");
+    const debounce = setTimeout(() => {
+      trackUserInteraction("property_search", { has_query: Boolean(searchQuery.trim()), has_filters: Boolean(city || area || minBedrooms || maxBedrooms || minBathrooms || maxBathrooms || minAnnualRent || maxAnnualRent) });
+      trackPropertyDiscoveryStep("anonymous", "search_properties");
+      (async () => {
+        if (!cancelled) {
+          setIsLoading(true);
+          setHasError(false);
+          try {
+            const filters: PropertySearchFilters = {
+              sortBy: (sortBy as PropertySearchFilters["sortBy"]) || "newest",
+              page,
+              pageSize: 20,
+            };
 
-      if (searchQuery.trim()) filters.query = searchQuery.trim();
-      if (city) filters.city = city;
-      if (area) filters.area = area;
-      if (minBedrooms && minBedrooms !== "Any")
-        filters.minBedrooms = parseInt(minBedrooms, 10);
-      if (maxBedrooms && maxBedrooms !== "Any" && maxBedrooms !== "4+")
-        filters.maxBedrooms = parseInt(maxBedrooms, 10);
-      if (maxBedrooms === "4+") filters.minBedrooms = 4;
-      if (minBathrooms && minBathrooms !== "Any")
-        filters.minBathrooms = parseInt(minBathrooms, 10);
-      if (maxBathrooms && maxBathrooms !== "Any" && maxBathrooms !== "3+")
-        filters.maxBathrooms = parseInt(maxBathrooms, 10);
-      if (maxBathrooms === "3+") filters.minBathrooms = 3;
-      if (minAnnualRent) filters.minAnnualRent = parseInt(minAnnualRent, 10);
-      if (maxAnnualRent) filters.maxAnnualRent = parseInt(maxAnnualRent, 10);
+            if (searchQuery.trim()) filters.query = searchQuery.trim();
+            if (city) filters.city = city;
+            if (area) filters.area = area;
+            if (minBedrooms && minBedrooms !== "Any")
+              filters.minBedrooms = parseInt(minBedrooms, 10);
+            if (maxBedrooms && maxBedrooms !== "Any" && maxBedrooms !== "4+")
+              filters.maxBedrooms = parseInt(maxBedrooms, 10);
+            if (maxBedrooms === "4+") filters.minBedrooms = 4;
+            if (minBathrooms && minBathrooms !== "Any")
+              filters.minBathrooms = parseInt(minBathrooms, 10);
+            if (maxBathrooms && maxBathrooms !== "Any" && maxBathrooms !== "3+")
+              filters.maxBathrooms = parseInt(maxBathrooms, 10);
+            if (maxBathrooms === "3+") filters.minBathrooms = 3;
+            if (minAnnualRent) filters.minAnnualRent = parseInt(minAnnualRent, 10);
+            if (maxAnnualRent) filters.maxAnnualRent = parseInt(maxAnnualRent, 10);
 
-      const result = await searchProperties(filters);
-      setProperties(result.data);
-      setTotal(result.total);
-      setTotalPages(result.totalPages);
-    } catch (error) {
-      console.error("Failed to fetch properties:", error);
-      setProperties([]);
-      setTotal(0);
-    } finally {
-      setIsLoading(false);
-    }
+            const result = await searchProperties(filters);
+            if (!cancelled) {
+              setProperties(result.data);
+              setTotal(result.total);
+              setTotalPages(result.totalPages);
+            }
+          } catch (error) {
+            if (!cancelled) {
+              console.error("Failed to fetch properties:", error);
+              setProperties([]);
+              setTotal(0);
+              setHasError(true);
+            }
+          } finally {
+            if (!cancelled) {
+              setIsLoading(false);
+            }
+          }
+        }
+      })();
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(debounce);
+    };
   }, [
     searchQuery,
     city,
@@ -176,17 +201,8 @@ function PropertiesContent() {
     maxAnnualRent,
     sortBy,
     page,
+    refetchTrigger,
   ]);
-
-  useEffect(() => {
-    startPropertyDiscovery("anonymous");
-    const debounce = setTimeout(() => {
-      trackUserInteraction("property_search", { has_query: Boolean(searchQuery.trim()), has_filters: Boolean(city || area || minBedrooms || maxBedrooms || minBathrooms || maxBathrooms || minAnnualRent || maxAnnualRent) });
-      trackPropertyDiscoveryStep("anonymous", "search_properties");
-      void fetchProperties();
-    }, 300);
-    return () => clearTimeout(debounce);
-  }, [fetchProperties, searchQuery, city, area, minBedrooms, maxBedrooms, minBathrooms, maxBathrooms, minAnnualRent, maxAnnualRent]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -240,7 +256,7 @@ function PropertiesContent() {
   };
 
   return (
-    <main className="min-h-screen bg-background">
+    <main id="main-content" className="min-h-screen bg-background">
       {/* Hero Header */}
       <section className="border-b-3 border-foreground bg-muted py-12 md:py-16">
         <div className="container mx-auto px-4">
@@ -600,6 +616,19 @@ function PropertiesContent() {
                 <PropertyCardSkeleton key={i} />
               ))}
             </LoadingState>
+          ) : hasError ? (
+            <EmptyState
+              icon={SearchX}
+              title="Something went wrong"
+              description="We encountered an error while trying to fetch the properties. Please try again."
+              action={{
+                label: "Try again",
+                onClick: () => {
+                  setHasError(false);
+                  setRefetchTrigger((prev) => prev + 1);
+                },
+              }}
+            />
           ) : properties.length === 0 ? (
             <EmptyState
               icon={SearchX}

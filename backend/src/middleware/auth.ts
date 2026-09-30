@@ -11,6 +11,7 @@ export interface AuthenticatedRequest extends Request {
     email: string
     name: string
     role: 'tenant' | 'landlord' | 'agent' | 'admin' | 'inspector' | 'super_admin'
+    walletAddress?: string
     displayCurrency?: 'NGN' | 'USDC'
   }
 }
@@ -78,9 +79,10 @@ export async function authenticateToken(
       email: user.email,
       name: user.name,
       role: user.role,
+      walletAddress: user.walletAddress,
       displayCurrency: user.displayCurrency,
     }
-    
+
     // Attach userId and role to Sentry scope for error tracking
     if (process.env.SENTRY_DSN_BACKEND && process.env.NODE_ENV !== "test") {
       Sentry.setUser({
@@ -88,7 +90,7 @@ export async function authenticateToken(
         role: user.role,
       });
     }
-    
+
     logger.info('User authenticated successfully', {
       userId: user.id,
       email: user.email,

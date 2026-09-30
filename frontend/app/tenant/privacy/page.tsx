@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import useAuthStore from "@/store/useAuthStore";
+import { formatDate } from "@/lib/date";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
 
@@ -122,7 +123,7 @@ export default function TenantPrivacyPage() {
   };
 
   return (
-    <main className="min-h-screen bg-background">
+    <main id="main-content" className="min-h-screen bg-background">
       <section className="border-b-3 border-foreground bg-muted py-12 md:py-16">
         <div className="container mx-auto px-4">
           <h1 className="font-mono text-3xl font-black md:text-4xl mb-2">
@@ -274,7 +275,7 @@ export default function TenantPrivacyPage() {
                   {erasureConfirmBy && (
                     <> Expected by:{" "}
                       <strong>
-                        {new Date(erasureConfirmBy).toLocaleDateString("en-NG", { dateStyle: "long" })}
+                        {formatDate(erasureConfirmBy, { dateStyle: "long" })}
                       </strong>
                     </>
                   )}

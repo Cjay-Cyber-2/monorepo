@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { formatDate } from "@/lib/date";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "";
@@ -173,7 +174,7 @@ export default function WhistleblowerVerificationPanel() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main id="main-content" className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-1">
             <div className="mb-4 border-3 border-foreground bg-card p-4 shadow-[4px_4px_0px_0px_rgba(26,26,26,1)]">
@@ -232,7 +233,7 @@ export default function WhistleblowerVerificationPanel() {
                         <p className="text-sm font-bold">{application.fullName}</p>
                         <p className="text-xs text-muted-foreground">{application.address}</p>
                         <p className="text-xs text-muted-foreground">
-                          {new Date(application.createdAt).toLocaleDateString()}
+                          {formatDate(application.createdAt)}
                         </p>
                       </div>
                       {application.status === "pending" && (
@@ -281,12 +282,12 @@ export default function WhistleblowerVerificationPanel() {
                     </p>
                     <p>
                       <span className="font-bold">Applied:</span>{" "}
-                      {new Date(selectedApplication.createdAt).toLocaleDateString()}
+                      {formatDate(selectedApplication.createdAt)}
                     </p>
                     {selectedApplication.reviewedAt && (
                       <p>
                         <span className="font-bold">Reviewed:</span>{" "}
-                        {new Date(selectedApplication.reviewedAt).toLocaleDateString()}
+                        {formatDate(selectedApplication.reviewedAt)}
                       </p>
                     )}
                     {selectedApplication.reviewedBy && (

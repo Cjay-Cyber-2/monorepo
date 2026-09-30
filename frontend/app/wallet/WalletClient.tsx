@@ -19,6 +19,7 @@ import {
 import { handleError, showSuccessToast } from "@/lib/toast";
 import { generateLedgerCsv, downloadCsv } from "@/lib/csvExport";
 import { formatConversionRate, formatNgn, formatUsdc } from "@/lib/currency";
+import { formatDateTime } from "@/lib/date";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +37,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { TopUpModal } from "@/components/wallet/TopUpModal";
 import { WithdrawalModal } from "@/components/wallet/WithdrawalModal";
 import { WithdrawalHistory } from "@/components/wallet/WithdrawalHistory";
+import { WalletStatusBadge } from "@/components/wallet/WalletStatusBadge";
 
 import {
   getNgnBalance,
@@ -152,13 +154,6 @@ function getTypesFromFilterIds(filterIds: string[]): WalletLedgerType[] {
 function getFilterLabel(filterId: string): string {
   const group = FILTER_GROUPS.find((g) => g.id === filterId);
   return group?.label ?? filterId;
-}
-
-function formatDateTime(iso: string): string {
-  return new Intl.DateTimeFormat("en-NG", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(iso));
 }
 
 function WalletPageContent() {
@@ -477,7 +472,7 @@ function WalletPageContent() {
   }, [setFilters]);
 
   return (
-    <main className="min-h-screen bg-background relative ">
+    <main id="main-content" className="min-h-screen bg-background relative ">
       <div className="container mx-auto px-4 py-8 md:py-10">
 
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -486,7 +481,10 @@ function WalletPageContent() {
               <Wallet className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold md:text-3xl">Wallet</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold md:text-3xl">Wallet</h1>
+                <WalletStatusBadge />
+              </div>
               <p className="text-sm text-muted-foreground">
                 Manage your NGN balance and view recent activity.
               </p>
@@ -958,7 +956,7 @@ function WalletPageContent() {
                               )}
                             </div>
                             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                              <span>{new Date(entry.timestamp).toLocaleString("en-NG")}</span>
+                              <span>{formatDateTime(entry.timestamp)}</span>
                               {entry.reference ? (
                                 <span className="truncate border border-foreground/20 bg-muted px-2 py-0.5 font-mono">
                                   {entry.reference}
@@ -1110,7 +1108,7 @@ export default function WalletPage() {
 // Skeleton shown during suspense
 function WalletPageSkeleton() {
   return (
-    <main className="min-h-screen bg-background">
+    <main id="main-content" className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 md:py-10">
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">

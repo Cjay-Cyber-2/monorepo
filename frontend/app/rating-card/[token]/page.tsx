@@ -21,6 +21,7 @@ import {
   getSharedRatingCard,
   type PublicRatingCard,
 } from "@/lib/ratingCardApi";
+import { formatDate } from "@/lib/date";
 
 // "success" covers both populated and empty-ratings cases (empty state is rendered inside SuccessPage)
 type PageState =
@@ -31,7 +32,7 @@ type PageState =
 
 function LoadingSkeleton() {
   return (
-    <main
+    <main id="main-content"
       className="min-h-screen bg-background"
       aria-label="Loading tenant rating card"
       aria-busy="true"
@@ -72,7 +73,7 @@ function LoadingSkeleton() {
 
 function ExpiredState({ rateLimited }: { rateLimited?: boolean }) {
   return (
-    <main className="min-h-screen bg-background flex items-center justify-center px-4">
+    <main id="main-content" className="min-h-screen bg-background flex items-center justify-center px-4">
       <Card
         className="border-3 border-foreground p-8 sm:p-12 shadow-[4px_4px_0px_0px_rgba(26,26,26,1)] text-center max-w-md w-full"
         role="main"
@@ -155,19 +156,11 @@ function ScoreBar({ label, score }: { label: string; score: number }) {
   );
 }
 
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-NG", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 function SuccessPage({ card }: { card: PublicRatingCard }) {
   const hasRatings = card.ratings.length > 0;
 
   return (
-    <main className="min-h-screen bg-background">
+    <main id="main-content" className="min-h-screen bg-background">
       <section className="border-b-3 border-foreground bg-muted py-8">
         <div className="container mx-auto px-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">

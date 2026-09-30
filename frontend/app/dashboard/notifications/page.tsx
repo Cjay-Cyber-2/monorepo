@@ -13,6 +13,7 @@ import {
   type NotificationItem,
 } from "@/lib/notificationsApi";
 import { cn } from "@/lib/utils";
+import { formatDateTime } from "@/lib/date";
 
 const CATEGORIES = [
   { value: "", label: "All" },
@@ -133,7 +134,7 @@ export default function NotificationsPage() {
   return (
     <div className="min-h-screen bg-background">
       <DashboardHeader />
-      <main className="container mx-auto max-w-2xl px-4 pt-24 pb-12">
+      <main id="main-content" className="container mx-auto max-w-2xl px-4 pt-24 pb-12">
         <div className="mb-6 flex items-center justify-between">
           <Link
             href="/dashboard/tenant"
@@ -225,7 +226,7 @@ export default function NotificationsPage() {
                     {n.body}
                   </p>
                   <p className="mt-2 text-xs text-muted-foreground">
-                    {new Date(n.createdAt).toLocaleString()}
+                    {formatDateTime(n.createdAt)}
                   </p>
                 </div>
                 {!n.read && (

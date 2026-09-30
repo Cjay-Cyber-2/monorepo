@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import useAuthStore from "@/store/useAuthStore";
 import { AlertCircle, ChevronDown, Loader2, RefreshCw, Shield } from "lucide-react";
+import { formatDate } from "@/lib/date";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
 
@@ -121,7 +122,7 @@ export default function AdminReportsPage() {
   const totalPages = Math.ceil(total / 20);
 
   return (
-    <main className="min-h-screen bg-background">
+    <main id="main-content" className="min-h-screen bg-background">
       <section className="border-b-3 border-foreground bg-muted py-8">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between">
@@ -233,9 +234,7 @@ export default function AdminReportsPage() {
                           </a>
                         )}
                         <p className="text-xs text-muted-foreground mt-2">
-                          {new Date(report.createdAt).toLocaleDateString("en-NG", {
-                            year: "numeric", month: "short", day: "numeric",
-                          })}
+                          {formatDate(report.createdAt)}
                         </p>
                       </div>
                       <button

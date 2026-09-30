@@ -27,6 +27,8 @@ import { PaymentTimeline } from "@/components/payment/PaymentTimeline"
 import { UpcomingScheduleTable } from "@/components/payment/UpcomingScheduleTable"
 import { DisputeDialog } from "@/components/payment/DisputeDialog"
 import { DisputeStatusTimeline } from "@/components/payment/DisputeStatusTimeline"
+import { FullPaymentModal } from "@/components/payment/FullPaymentModal"
+import type { FullPaymentReceipt } from "@/lib/paymentApi"
 import { canFileDispute } from "@/lib/disputeTimeline"
 import { formatNgn } from "@/lib/currency"
 import {
@@ -37,6 +39,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import type { PaymentHistoryItem } from "@/lib/tenantApi"
+import { summarizePayments } from "@/lib/installmentSchedule"
+import type { InstalmentInput } from "@/lib/installmentSchedule"
 
 type ActiveTab = "schedule" | "history"
 
@@ -54,6 +58,8 @@ export default function TenantPaymentsPage() {
   const [disputes, setDisputes] = useState<PaymentDispute[]>([])
   const [disputeDialogPayment, setDisputeDialogPayment] = useState<PaymentHistoryItem | null>(null)
   const [viewDispute, setViewDispute] = useState<PaymentDispute | null>(null)
+  const [fullPaymentModalOpen, setFullPaymentModalOpen] = useState(false)
+  const [paymentSummary, setPaymentSummary] = useState<ReturnType<typeof summarizePayments> | null>(null)
 
   const {
     payments,
@@ -81,6 +87,17 @@ export default function TenantPaymentsPage() {
         setSelectedDeal(
           scheduleRes.data.dealId || scheduleRes.data.deals?.[0]?.dealId || null,
         )
+
+        const instalments: InstalmentInput[] = scheduleRes.data.schedule.map(
+          (item: PaymentScheduleItem) => ({
+            period: item.period,
+            dueDate: item.dueDate,
+            amountNgn: item.amount,
+            paid: item.status === "paid",
+          })
+        )
+        const summary = summarizePayments(instalments)
+        setPaymentSummary(summary)
       }
 
       if (walletRes.success) {
@@ -182,11 +199,16 @@ export default function TenantPaymentsPage() {
     void loadData()
   }
 
+  const handleFullPaymentSuccess = (receipt: FullPaymentReceipt) => {
+    showSuccessToast(`Full payment confirmed (ref ${receipt.reference})`)
+    void loadData()
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <DashboardHeader />
-        <main className="ml-64 min-h-screen pt-20 flex items-center justify-center">
+        <main id="main-content" className="ml-64 min-h-screen pt-20 flex items-center justify-center">
           <div
             aria-live="polite"
             aria-busy="true"
@@ -209,7 +231,7 @@ export default function TenantPaymentsPage() {
         userInfo={{ name: "Ngozi Adekunle", roleLabel: "Tenant" }}
       />
 
-      <main className="lg:ml-64 min-h-screen pt-20">
+      <main id="main-content" className="lg:ml-64 min-h-screen pt-20">
         <div className="p-8">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground">Payments</h1>
@@ -241,9 +263,9 @@ export default function TenantPaymentsPage() {
                   <AlertCircle className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Next Payment</p>
+                  <p className="text-sm text-muted-foreground">Outstanding</p>
                   <p className="text-xl font-bold">
-                    {nextPayment ? formatNgn(nextPayment.amount) : "N/A"}
+                    {paymentSummary ? formatNgn(paymentSummary.outstanding) : "N/A"}
                   </p>
                 </div>
               </div>
@@ -257,9 +279,9 @@ export default function TenantPaymentsPage() {
                   <Calendar className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Due Date</p>
+                  <p className="text-sm text-muted-foreground">Progress</p>
                   <p className="text-xl font-bold">
-                    {nextPayment ? nextPayment.dueDate : "N/A"}
+                    {paymentSummary ? `${paymentSummary.progressPercent}%` : "N/A"}
                   </p>
                 </div>
               </div>
@@ -336,10 +358,20 @@ export default function TenantPaymentsPage() {
                   </p>
                 </div>
                 {nextPayment ? (
-                  <div className="rounded-3xl border-2 border-foreground/20 bg-muted p-4">
-                    <p className="text-sm text-muted-foreground">Next due installment</p>
-                    <p className="text-2xl font-bold">{formatNgn(nextPayment.amount)}</p>
-                    <p className="text-sm text-muted-foreground">Due {nextPayment.dueDate}</p>
+                  <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+                    <div className="rounded-3xl border-2 border-foreground/20 bg-muted p-4">
+                      <p className="text-sm text-muted-foreground">Next due installment</p>
+                      <p className="text-2xl font-bold">{formatNgn(nextPayment.amount)}</p>
+                      <p className="text-sm text-muted-foreground">Due {nextPayment.dueDate}</p>
+                    </div>
+                    {selectedDeal ? (
+                      <Button
+                        variant="outline"
+                        onClick={() => setFullPaymentModalOpen(true)}
+                      >
+                        Pay in Full
+                      </Button>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -434,6 +466,15 @@ export default function TenantPaymentsPage() {
           {viewDispute ? <DisputeStatusTimeline dispute={viewDispute} /> : null}
         </DialogContent>
       </Dialog>
+
+      {selectedDeal ? (
+        <FullPaymentModal
+          paymentId={selectedDeal}
+          open={fullPaymentModalOpen}
+          onOpenChange={setFullPaymentModalOpen}
+          onSuccess={handleFullPaymentSuccess}
+        />
+      ) : null}
     </div>
   )
 }

@@ -11,6 +11,7 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
+import { formatDate } from "@/lib/date";
 
 export interface RevenueTimelineItem {
   date: string;
@@ -18,8 +19,13 @@ export interface RevenueTimelineItem {
   amount: number;
 }
 
+export interface RevenueTimelineData {
+  series: RevenueTimelineItem[];
+  dataSource: "live" | "mock";
+}
+
 export interface RevenueChartProps {
-  data?: RevenueTimelineItem[];
+  data?: RevenueTimelineData;
   isLoading?: boolean;
   onRangeChange?: (range: "7d" | "30d" | "90d") => void;
 }
@@ -35,12 +41,7 @@ const formatFullCurrency = (val: number) => {
 
 // Format date labels
 const formatDateLabel = (dateStr: string) => {
-  try {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  } catch {
-    return dateStr;
-  }
+  return formatDate(dateStr, { month: "short", day: "numeric" });
 };
 
 // Custom Neobrutalist Tooltip — declared at module level to avoid creating during render
@@ -78,7 +79,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export function RevenueChart({
-  data = [],
+  data,
   isLoading = false,
   onRangeChange,
 }: RevenueChartProps) {
@@ -95,11 +96,12 @@ export function RevenueChart({
   // e.g. [{ date: '2026-05-01', feeType: 'platform_fee', amount: 50000 }]
   // => [{ date: '2026-05-01', 'Platform Fee': 50000, 'Underwriting Fee': 0, total: 50000 }]
   const pivotedData = React.useMemo(() => {
-    if (!data || data.length === 0) return [];
+    const series = data?.series || [];
+    if (!series || series.length === 0) return [];
     
     const dayMap = new Map<string, Record<string, any>>();
     
-    data.forEach((item) => {
+    series.forEach((item) => {
       if (!dayMap.has(item.date)) {
         dayMap.set(item.date, {
           date: item.date,
@@ -122,7 +124,7 @@ export function RevenueChart({
     });
 
     return Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
-  }, [data]);
+  }, [data?.series]);
 
   // Format currency values nicely (in NGN)
   const formatCurrency = (val: number) => {

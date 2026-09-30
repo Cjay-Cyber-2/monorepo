@@ -7,6 +7,7 @@ import type { QueuedTransaction } from "@/lib/timelockApi";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { formatDateTime } from "@/lib/date";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -47,11 +48,11 @@ function TransactionCard({ tx, onExecute, onCancel }: { tx: any, onExecute: any,
           <div className="flex items-center gap-4 pt-2">
             <div className="flex items-center gap-1.5 text-xs font-bold">
               <Clock className="w-4 h-4" />
-              <span>ETA: {new Date(tx.eta * 1000).toLocaleString()}</span>
+              <span>ETA: {formatDateTime(tx.eta * 1000)}</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs font-bold">
               <History className="w-4 h-4" />
-              <span>Queued: {new Date(tx.createdAt).toLocaleString()}</span>
+              <span>Queued: {formatDateTime(tx.createdAt)}</span>
             </div>
           </div>
         </div>
@@ -127,7 +128,7 @@ export default function TimelockAdminPage() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-12 md:py-20">
+      <main id="main-content" className="container mx-auto px-4 py-12 md:py-20">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           <div className="lg:col-span-2 space-y-8">
             <div className="flex items-center justify-between">

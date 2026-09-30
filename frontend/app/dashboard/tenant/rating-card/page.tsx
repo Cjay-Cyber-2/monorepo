@@ -16,6 +16,7 @@ import {
   getRatingCard,
   type TenantRatingCard,
 } from "@/lib/ratingCardApi";
+import { formatDate } from "@/lib/date";
 
 export default function TenantRatingCardPage() {
   const [card, setCard] = useState<TenantRatingCard | null>(null);
@@ -31,13 +32,6 @@ export default function TenantRatingCardPage() {
       .finally(() => setIsLoading(false));
   }, [tenantId]);
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("en-NG", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
 
   const renderScoreBar = (label: string, score: number) => (
     <div className="flex items-center gap-3">
@@ -77,7 +71,7 @@ export default function TenantRatingCardPage() {
       />
 
       {/* Main Content */}
-      <main className="lg:ml-64 min-h-screen pt-20">
+      <main id="main-content" className="lg:ml-64 min-h-screen pt-20">
         <div className="p-8">
           {/* Header */}
           <div className="mb-8">

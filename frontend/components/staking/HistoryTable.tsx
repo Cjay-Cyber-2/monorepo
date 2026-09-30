@@ -11,6 +11,7 @@ import {
   ListRowSkeleton,
   LoadingState,
 } from "@/components/ui/data-state";
+import { formatDateTime } from "@/lib/date";
 
 interface HistoryTableProps {
   walletAddress?: string | null;
@@ -42,21 +43,6 @@ export function HistoryTable({ walletAddress }: HistoryTableProps) {
   useEffect(() => {
     fetchHistory();
   }, [fetchHistory]);
-
-  const formatDateTime = (isoString: string) => {
-    try {
-      const date = new Date(isoString);
-      return date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return isoString;
-    }
-  };
 
   const getTxTypeDetails = (type: string) => {
     switch (type) {
@@ -115,6 +101,7 @@ export function HistoryTable({ walletAddress }: HistoryTableProps) {
           disabled={isLoading}
           className="p-2 text-muted-foreground hover:text-foreground rounded-lg border border-foreground/10 hover:bg-muted transition-all disabled:opacity-50"
           title="Refresh History"
+          aria-label="Refresh history"
         >
           <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
         </button>

@@ -1,4 +1,4 @@
-import { apiClient } from "./api-client";
+import { apiGet } from "./apiClient";
 import { formatNgn } from "./currency";
 
 export interface GasEstimate {
@@ -57,7 +57,7 @@ export async function estimateGas(
   complexity: "simple" | "moderate" | "complex" = "moderate"
 ): Promise<GasEstimate & { benchmark: GasBenchmark | null }> {
   try {
-    const response = await apiClient.get<{
+    const response = await apiGet<{
       success: boolean;
       functionName: string;
       estimate: GasEstimate;

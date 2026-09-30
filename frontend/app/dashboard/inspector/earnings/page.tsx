@@ -16,6 +16,7 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 import { propertyInspectionApi, type InspectorEarnings } from "@/lib/propertyInspectionApi";
 import { useFeatureFlag } from "@/lib/featureFlags";
+import { formatDate } from "@/lib/date";
 
 export default function EarningsPage() {
   const isEnabled = useFeatureFlag("INSPECTOR_DASHBOARD_ENABLED");
@@ -59,7 +60,7 @@ export default function EarningsPage() {
     return (
       <div className="min-h-screen bg-background">
         <DashboardHeader />
-        <main className="lg:pl-64">
+        <main id="main-content" className="lg:pl-64">
           <div className="p-6 lg:p-8">
             <Card className="border-3 border-foreground p-12 text-center shadow-[4px_4px_0px_0px_rgba(26,26,26,1)]">
               <DollarSign className="mx-auto h-16 w-16 text-muted-foreground" />
@@ -86,7 +87,7 @@ export default function EarningsPage() {
       />
 
       {/* Main Content */}
-      <main className="lg:pl-64">
+      <main id="main-content" className="lg:pl-64">
         <div className="p-6 lg:p-8">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground">Earnings</h1>
@@ -210,7 +211,7 @@ export default function EarningsPage() {
                       </p>
                       <div className="mt-2 flex items-center gap-4 text-sm">
                         <span className="text-muted-foreground">
-                          Completed: {new Date(inspection.completedAt).toLocaleDateString()}
+                          Completed: {formatDate(inspection.completedAt)}
                         </span>
                       </div>
                     </div>

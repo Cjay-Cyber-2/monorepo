@@ -3,6 +3,8 @@
 import { useState, useCallback } from "react";
 import { Copy, ExternalLink, ArrowRight, AlertCircle, Check, Loader2 } from "lucide-react";
 import { handleError, showSuccessToast } from "@/lib/toast";
+import { formatNgn } from "@/lib/currency";
+import { formatDateTime } from "@/lib/date";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -46,14 +48,6 @@ const RAIL_OPTIONS: { value: TopUpRail; label: string }[] = [
   { value: "bank_transfer", label: "Bank Transfer" },
 ];
 
-function formatNgn(amount: number) {
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: "NGN",
-    minimumFractionDigits: 0,
-  }).format(amount);
-}
-
 export function TopUpModal({ open, onOpenChange, onSuccess }: TopUpModalProps) {
   const [step, setStep] = useState<Step>("input");
   const [amount, setAmount] = useState<string>("");
@@ -84,10 +78,10 @@ export function TopUpModal({ open, onOpenChange, onSuccess }: TopUpModalProps) {
       return "Please enter a valid amount";
     }
     if (num < MIN_TOP_UP) {
-      return `Minimum top-up is ${formatNgn(MIN_TOP_UP)}`;
+      return `Minimum top-up is ${formatNgn(MIN_TOP_UP, undefined, { fractionDigits: 0 })}`;
     }
     if (num > MAX_TOP_UP) {
-      return `Maximum top-up is ${formatNgn(MAX_TOP_UP)}`;
+      return `Maximum top-up is ${formatNgn(MAX_TOP_UP, undefined, { fractionDigits: 0 })}`;
     }
     return null;
   };
@@ -180,7 +174,7 @@ export function TopUpModal({ open, onOpenChange, onSuccess }: TopUpModalProps) {
                 disabled={isSubmitting}
               />
               <p className="text-xs text-muted-foreground">
-                Min: {formatNgn(MIN_TOP_UP)} · Max: {formatNgn(MAX_TOP_UP)}
+                Min: {formatNgn(MIN_TOP_UP, undefined, { fractionDigits: 0 })} · Max: {formatNgn(MAX_TOP_UP, undefined, { fractionDigits: 0 })}
               </p>
             </div>
 
@@ -239,7 +233,7 @@ export function TopUpModal({ open, onOpenChange, onSuccess }: TopUpModalProps) {
             <div className="rounded-md border-2 border-foreground bg-muted p-4">
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Amount</span>
-                <span className="font-mono font-bold">{formatNgn(topUpResult.amountNgn)}</span>
+                <span className="font-mono font-bold">{formatNgn(topUpResult.amountNgn, undefined, { fractionDigits: 0 })}</span>
               </div>
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Reference</span>
@@ -343,7 +337,7 @@ export function TopUpModal({ open, onOpenChange, onSuccess }: TopUpModalProps) {
 
                 {topUpResult.expiresAt && (
                   <p className="text-xs text-muted-foreground">
-                    Expires: {new Date(topUpResult.expiresAt).toLocaleString("en-NG")}
+                    Expires: {formatDateTime(topUpResult.expiresAt)}
                   </p>
                 )}
               </div>
