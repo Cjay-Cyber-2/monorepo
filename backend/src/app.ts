@@ -147,6 +147,7 @@ import {
 import { createPartnerLandlordApplicationsRouter } from "./routes/partnerLandlordApplications.js";
 import { createApartmentReviewsRouter } from "./routes/apartmentReviews.js";
 import { createComplianceReportRouter } from "./routes/complianceReport.js";
+import { flushQueuedMessageNotificationDigest, sendQueuedMessageNotificationEmail, type PendingMessageDigest } from "./services/messageNotificationService.js";
 import { createWhistleblowerReportsRouter } from "./routes/whistleblowerReports.js";
 import { createTenantDataExportRouter } from "./routes/tenantDataExport.js";
 import { createTenantErasureRouter } from "./routes/tenantErasure.js";
@@ -182,10 +183,6 @@ import { createKycWebhookRouter } from "./routes/kyc.js";
 import { createOnboardingRouter } from "./routes/onboarding.js";
 import { createEmployersRouter } from "./routes/employers.js";
 import { createMessagingRouter } from "./routes/messaging.js";
-import {
-  flushQueuedMessageNotificationDigest,
-  sendQueuedMessageNotificationEmail,
-} from "./services/messageNotificationService.js";
 import { createAttachmentsRouter } from "./routes/attachments.js";
 import { MonthlyDeductionReminderJob } from "./jobs/monthlyDeductionReminderJob.js";
 import { dataRetentionPurgeJobHandler, DATA_RETENTION_PURGE_JOB_NAME } from "./jobs/dataRetentionPurgeJob.js";
@@ -453,14 +450,10 @@ export function createApp() {
     await notificationService.send(job.payload as any)
   })
   jobScheduler.registerHandler('messaging.notification.digest', async (job) => {
-    await flushQueuedMessageNotificationDigest(
-      (job.payload as { key: string }).key,
-    )
+    await flushQueuedMessageNotificationDigest(job.payload as { key: string; digest?: PendingMessageDigest })
   })
   jobScheduler.registerHandler('messaging.notification.email', async (job) => {
-    await sendQueuedMessageNotificationEmail(
-      (job.payload as { key: string }).key,
-    )
+    await sendQueuedMessageNotificationEmail(job.payload as { key: string; digest?: PendingMessageDigest })
   })
 
   // Register webhook delivery job handler
