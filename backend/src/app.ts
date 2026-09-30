@@ -532,20 +532,6 @@ export function createApp() {
   jobScheduler.registerHandler('messaging.notification.email', async (job) => {
     await sendQueuedMessageNotificationEmail(job.payload as { key: string; digest?: PendingMessageDigest })
   })
-  const notificationService = getNotificationService();
-  jobScheduler.registerHandler("notification.send", async (job) => {
-    await notificationService.send(job.payload as any);
-  });
-  jobScheduler.registerHandler("messaging.notification.digest", async (job) => {
-    await flushQueuedMessageNotificationDigest(
-      (job.payload as { key: string }).key,
-    );
-  });
-  jobScheduler.registerHandler("messaging.notification.email", async (job) => {
-    await sendQueuedMessageNotificationEmail(
-      (job.payload as { key: string }).key,
-    );
-  });
 
   // Register webhook delivery job handler
   jobScheduler.registerHandler("webhook.delivery", async (job) => {

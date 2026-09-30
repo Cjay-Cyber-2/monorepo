@@ -24,11 +24,6 @@ export function createPrometheusMetricsRouter(): Router {
       res.setHeader('Content-Type', metricsRegister.contentType)
       res.end(await metricsRegister.metrics())
     } catch (error) {
-      next(error)
-      const metrics = await metricsRegister.metrics()
-      res.setHeader('Content-Type', metricsRegister.contentType)
-      res.end(metrics)
-    } catch (error) {
       console.error('Failed to generate Prometheus metrics:', error)
       res.status(500).json({ error: 'Failed to generate metrics' })
     }

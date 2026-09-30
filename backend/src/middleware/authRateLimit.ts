@@ -208,14 +208,12 @@ export function refreshTokenRateLimit(options?: {
 
 export function _testOnly_clearAuthRateLimits() {
   slidingWindowLimiter.clear()
-}
   emailOtpRequestCounters.clear()
   ipOtpRequestCounters.clear()
   ipOtpVerifyCounters.clear()
   ipRefreshCounters.clear()
   walletChallengeRequestCounters.clear()
   ipWalletChallengeRequestCounters.clear()
-  slidingWindowLimiter.clear()
 }
 
 export function _testOnly_prefillEmailOtpCounter(email: string, count: number) {
