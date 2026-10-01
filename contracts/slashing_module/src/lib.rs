@@ -1719,18 +1719,6 @@ mod tests {
         let inspector = Address::generate(&env);
         let reason = soroban_sdk::String::from_str(&env, "excessive_slashes");
 
-        let env = Env::default();
-        env.mock_all_auths();
-        let contract_id = env.register(SlashingModule, ());
-        let client = SlashingModuleClient::new(&env, &contract_id);
-        let admin = Address::generate(&env);
-        client.init(&admin);
-        let bond_contract = Address::generate(&env);
-        client.set_bond_contract(&admin, &bond_contract);
-
-        let inspector = Address::generate(&env);
-        let reason = soroban_sdk::String::from_str(&env, "excessive_slashes");
-
         // Perform more slashes than MAX_INSPECTOR_HISTORY (50)
         for i in 0..60 {
             let insp_id = soroban_sdk::String::from_str(&env, &std::format!("INSP-{i}"));
