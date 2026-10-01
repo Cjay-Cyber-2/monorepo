@@ -29,7 +29,6 @@ mod tests {
     }
 
     fn setup(env: &Env) -> (Address, TimelockClient<'_>, Address, Address) {
-        env.mock_all_auths();
         let timelock_id = env.register(Timelock, ());
         let client = TimelockClient::new(env, &timelock_id);
         let admin = Address::generate(env);

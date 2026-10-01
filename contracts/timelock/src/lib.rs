@@ -62,8 +62,6 @@ impl Timelock {
         if env.storage().instance().has(&DataKey::Admin) {
             return Err(TimelockError::AlreadyInitialized);
         }
-        admin.require_auth();
-
         if min_delay > max_delay {
             return Err(TimelockError::InvalidDelay);
         }
