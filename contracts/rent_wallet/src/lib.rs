@@ -583,6 +583,7 @@ mod test {
     #[test]
     fn init_sets_admin() {
         let env = Env::default();
+        env.mock_all_auths();
         let contract_id = env.register(RentWallet, ());
         let client = RentWalletClient::new(&env, &contract_id);
         let admin = Address::generate(&env);
@@ -609,6 +610,7 @@ mod test {
     #[test]
     fn version_matches_contract_version() {
         let env = Env::default();
+        env.mock_all_auths();
         let contract_id = env.register(RentWallet, ());
         let client = RentWalletClient::new(&env, &contract_id);
         let admin = Address::generate(&env);
@@ -622,6 +624,7 @@ mod test {
     #[test]
     fn init_initializes_empty_balances() {
         let env = Env::default();
+        env.mock_all_auths();
         let contract_id = env.register(RentWallet, ());
         let client = RentWalletClient::new(&env, &contract_id);
         let admin = Address::generate(&env);
@@ -636,6 +639,7 @@ mod test {
     #[test]
     fn init_cannot_be_called_twice() {
         let env = Env::default();
+        env.mock_all_auths();
         let contract_id = env.register(RentWallet, ());
         let client = RentWalletClient::new(&env, &contract_id);
         let admin = Address::generate(&env);
