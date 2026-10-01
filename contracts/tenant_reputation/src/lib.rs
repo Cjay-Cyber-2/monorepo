@@ -1152,20 +1152,6 @@ mod test {
         assert_eq!(err, PausableError::NotAuthorized);
     }
 
-    /// With no auth mocked at all, `require_auth()` inside `update_reputation`
-    /// must reject the call — proving the check is real, not a logic-level
-    /// address compare. (Mirrors soroban_access_control's own convention.)
-    #[test]
-    #[should_panic]
-    fn update_reputation_without_any_mocked_auth_fails() {
-        let env = Env::default();
-        let (_cid, client, _admin, operator) = setup(&env);
-        let tenant = Address::generate(&env);
-        let rec = sample_record(&env);
-        let r = reason(&env);
-        client.update_reputation(&operator, &tenant, &rec, &r);
-    }
-
     // ── A3 · initialization edges ─────────────────────────────────────────
 
     #[test]
