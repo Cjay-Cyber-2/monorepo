@@ -31,7 +31,7 @@ export default function CareersPage() {
             Back to Home
           </Link>
           <a
-            href="mailto:careers@shelterflex.com"
+            href="mailto:hello@shelterflex.com?subject=Careers%20at%20Shelterflex"
             className="inline-flex items-center justify-center font-mono font-bold px-6 py-3 border-2 border-foreground bg-background text-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all"
           >
             Get in Touch
