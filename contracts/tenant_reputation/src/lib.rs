@@ -1698,6 +1698,7 @@ mod test {
         let client = TenantReputationClient::new(&env, &cid);
         let admin = Address::generate(&env);
         let operator = Address::generate(&env);
+        env.mock_all_auths();
         client.try_init(&admin, &operator).unwrap().unwrap();
         assert!(env.events().all().is_empty());
     }
