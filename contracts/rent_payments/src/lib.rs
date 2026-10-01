@@ -494,6 +494,7 @@ mod test {
     };
 
     fn setup(env: &Env) -> (Address, RentPaymentsClient<'_>, soroban_sdk::Address) {
+        env.mock_all_auths();
         let contract_id = env.register(RentPayments, ());
         let client = RentPaymentsClient::new(env, &contract_id);
         let admin = Address::generate(env);
@@ -513,6 +514,7 @@ mod test {
     #[test]
     fn init_sets_version_to_one() {
         let env = Env::default();
+        env.mock_all_auths();
         let contract_id = env.register(RentPayments, ());
         let client = RentPaymentsClient::new(&env, &contract_id);
         let admin = Address::generate(&env);
@@ -523,6 +525,7 @@ mod test {
     #[test]
     fn version_matches_contract_version() {
         let env = Env::default();
+        env.mock_all_auths();
         let contract_id = env.register(RentPayments, ());
         let client = RentPaymentsClient::new(&env, &contract_id);
         let admin = Address::generate(&env);
@@ -534,6 +537,7 @@ mod test {
     #[test]
     fn init_cannot_be_called_twice() {
         let env = Env::default();
+        env.mock_all_auths();
         let contract_id = env.register(RentPayments, ());
         let client = RentPaymentsClient::new(&env, &contract_id);
         let admin = Address::generate(&env);
