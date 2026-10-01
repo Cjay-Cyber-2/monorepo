@@ -50,6 +50,7 @@ pub enum ContractError {
     ProposalNotPassed = 9,
     ProposalAlreadyExecuted = 10,
     QuorumNotReached = 11,
+    ArithmeticOverflow = 12,
 }
 
 // ── Data Structures ───────────────────────────────────────────────────────────
@@ -266,12 +267,12 @@ impl Governance {
             proposal.votes_for = proposal
                 .votes_for
                 .checked_add(weight)
-                .unwrap_or(proposal.votes_for);
+                .ok_or(ContractError::ArithmeticOverflow)?;
         } else {
             proposal.votes_against = proposal
                 .votes_against
                 .checked_add(weight)
-                .unwrap_or(proposal.votes_against);
+                .ok_or(ContractError::ArithmeticOverflow)?;
         }
 
         env.storage()
@@ -308,12 +309,12 @@ impl Governance {
         let total_votes = proposal
             .votes_for
             .checked_add(proposal.votes_against)
-            .unwrap_or(0);
+            .ok_or(ContractError::ArithmeticOverflow)?;
         let quorum_required = total_staked
             .checked_mul(QUORUM_BPS)
-            .unwrap_or(0)
+            .ok_or(ContractError::ArithmeticOverflow)?
             .checked_div(10_000)
-            .unwrap_or(0);
+            .ok_or(ContractError::ArithmeticOverflow)?;
 
         proposal.status = if total_votes < quorum_required {
             ProposalStatus::Rejected
@@ -542,7 +543,9 @@ mod tests {
         give_stake(&env, &client, &admin, &voter, 800_000);
 
         let pid = client.create_proposal(&proposer, &Symbol::new(&env, "param"), &1, &2);
-        client.vote(&voter, &pid, &true);
+        let result = client.try_vote(&voter, &pid, &true);
+        assert_eq!(result, Err(Ok(ContractError::ArithmeticOverflow)));
+        assert_eq!(client.get_proposal(&pid).unwrap().votes_for, i128::MAX);
 
         env.ledger()
             .with_mut(|li| li.timestamp = VOTING_PERIOD_SECS + 1);

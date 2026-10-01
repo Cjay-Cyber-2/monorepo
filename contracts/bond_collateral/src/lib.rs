@@ -161,6 +161,30 @@ fn calculate_collateral_ratio_oracle(collateral: i128, bond: i128, price: i128) 
     (collateral * price * 100 / (PRICE_SCALE * bond)) as u32
 }
 
+fn calculate_bond_reduction(
+    seize_amount: i128,
+    effective_price: i128,
+    bond: i128,
+) -> Result<i128, ContractError> {
+    let value = seize_amount
+        .checked_mul(effective_price)
+        .ok_or(ContractError::InvalidAmount)?;
+    let reduction = value
+        .checked_div(PRICE_SCALE)
+        .ok_or(ContractError::InvalidAmount)?;
+    Ok(reduction.min(bond))
+}
+
+fn calculate_keeper_reward(seize_amount: i128, reward_cap: u32) -> Result<i128, ContractError> {
+    let value = seize_amount
+        .checked_mul(reward_cap as i128)
+        .ok_or(ContractError::InvalidAmount)?;
+    let reward = value
+        .checked_div(10_000)
+        .ok_or(ContractError::InvalidAmount)?;
+    Ok(reward.min(seize_amount))
+}
+
 /// Minimum collateral to seize so the position reaches target_ratio after
 /// proportional bond reduction.  Returns collateral (full seizure) when the
 /// position is too far underwater to reach target_ratio partially.
@@ -681,21 +705,11 @@ impl BondCollateral {
         let seize_amount = raw_seize.max(1).min(collateral);
 
         // Bond debt retired is proportional to the oracle value of seized collateral.
-        let bond_reduction = seize_amount
-            .checked_mul(effective_price)
-            .unwrap_or(0)
-            .checked_div(PRICE_SCALE)
-            .unwrap_or(0)
-            .min(bond);
+        let bond_reduction = calculate_bond_reduction(seize_amount, effective_price, bond)?;
 
         // Keeper reward bounded by reward cap bps of seized collateral.
         let reward_cap = get_keeper_reward_cap(&env);
-        let keeper_reward = seize_amount
-            .checked_mul(reward_cap as i128)
-            .unwrap_or(0)
-            .checked_div(10_000)
-            .unwrap_or(0)
-            .min(seize_amount);
+        let keeper_reward = calculate_keeper_reward(seize_amount, reward_cap)?;
 
         // Update position accounting.
         let new_collateral = collateral - seize_amount;
@@ -1465,6 +1479,14 @@ mod additional_coverage_tests {
         let mut bytes = [0u8; 32];
         bytes[0..8].copy_from_slice(&seed.to_be_bytes());
         BytesN::from_array(env, &bytes)
+    }
+
+    #[test]
+    fn liquidation_arithmetic_overflow_is_rejected() {
+        assert_eq!(
+            calculate_bond_reduction(2, i128::MAX, 1),
+            Err(ContractError::InvalidAmount)
+        );
     }
 
     // ── Initialization edge cases ──────────────────────────────────────────
