@@ -462,8 +462,11 @@ impl RentToOwn {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
+#[cfg(kani)]
+mod formal_properties;
+
 #[cfg(test)]
-mod tests {
+mod test {
     extern crate std;
 
     use super::*;
