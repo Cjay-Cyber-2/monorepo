@@ -1514,6 +1514,7 @@ mod test {
         let token_contract = env.register_stellar_asset_contract_v2(token_admin);
         let token_contract_id = token_contract.address();
 
+        env.mock_all_auths();
         client
             .try_init(&admin, &token_contract_id)
             .unwrap()
