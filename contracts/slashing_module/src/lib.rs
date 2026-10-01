@@ -197,6 +197,7 @@ impl SlashingModule {
         if env.storage().instance().has(&DataKey::Admin) {
             return Err(ContractError::AlreadyInitialized);
         }
+        admin.require_auth();
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.events().publish(
             (Symbol::new(&env, "slashing"), Symbol::new(&env, "init")),
@@ -1163,6 +1164,17 @@ mod tests {
         client.init(&admin);
         client.set_submitter(&admin, &submitter, &true);
         (admin, submitter, client)
+    }
+
+    #[test]
+    #[should_panic]
+    fn init_requires_admin_auth() {
+        let env = Env::default();
+        let id = env.register(SlashingModule, ());
+        let client = SlashingModuleClient::new(&env, &id);
+        let admin = Address::generate(&env);
+
+        client.init(&admin);
     }
 
     // Seed the actor's staked balance directly via admin helper.
