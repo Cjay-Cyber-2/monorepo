@@ -1249,6 +1249,7 @@ mod test {
     #[test]
     fn init_defaults_zero_staleness_to_600() {
         let env = Env::default();
+        env.mock_all_auths();
         let contract_id = env.register(OraclePriceFeeds, ());
         let client = OraclePriceFeedsClient::new(&env, &contract_id);
         let admin = Address::generate(&env);
@@ -1283,6 +1284,7 @@ mod test {
     #[test]
     fn init_defaults_zero_deviation_to_500() {
         let env = Env::default();
+        env.mock_all_auths();
         let contract_id = env.register(OraclePriceFeeds, ());
         let client = OraclePriceFeedsClient::new(&env, &contract_id);
         let admin = Address::generate(&env);
