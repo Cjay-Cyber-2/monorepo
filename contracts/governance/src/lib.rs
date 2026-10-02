@@ -554,9 +554,7 @@ mod tests {
         give_stake(&env, &client, &admin, &voter, 800_000);
 
         let pid = client.create_proposal(&proposer, &Symbol::new(&env, "param"), &1, &2);
-        let result = client.try_vote(&voter, &pid, &true);
-        assert_eq!(result, Err(Ok(ContractError::ArithmeticOverflow)));
-        assert_eq!(client.get_proposal(&pid).unwrap().votes_for, i128::MAX);
+        client.vote(&voter, &pid, &true);
 
         env.ledger()
             .with_mut(|li| li.timestamp = VOTING_PERIOD_SECS + 1);
@@ -1246,7 +1244,9 @@ mod tests {
 
         let pid = client.create_proposal(&proposer, &Symbol::new(&env, "param"), &1, &2);
         client.vote(&proposer, &pid, &true);
-        client.vote(&voter, &pid, &true);
+        let result = client.try_vote(&voter, &pid, &true);
+        assert_eq!(result, Err(Ok(ContractError::ArithmeticOverflow)));
+        assert_eq!(client.get_proposal(&pid).unwrap().votes_for, i128::MAX);
     }
 
     // --- Event assertions ---------------------------------------------------
