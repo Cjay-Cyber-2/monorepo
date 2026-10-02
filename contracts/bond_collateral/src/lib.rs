@@ -203,20 +203,6 @@ fn compute_seize_amount(collateral: i128, bond: i128, price: i128, target_ratio:
     numerator / denominator
 }
 
-fn calculate_bond_reduction(
-    seize_amount: i128,
-    effective_price: i128,
-    bond: i128,
-) -> Result<i128, ContractError> {
-    let value = seize_amount
-        .checked_mul(effective_price)
-        .ok_or(ContractError::InvalidAmount)?;
-    let reduction = value
-        .checked_div(PRICE_SCALE)
-        .ok_or(ContractError::InvalidAmount)?;
-    Ok(reduction.min(bond))
-}
-
 /// Fetch oracle price from the configured feed contract.  Returns None when no
 /// feed address has been set, allowing callers to fall back to 1:1 pricing.
 fn try_fetch_oracle_price(env: &Env) -> Option<OraclePrice> {
