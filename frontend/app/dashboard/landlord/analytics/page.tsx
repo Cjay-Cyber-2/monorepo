@@ -139,7 +139,7 @@ export default function LandlordAnalyticsPage() {
       <DashboardHeader />
       <LandlordSidebar />
       
-      <main className="min-h-screen pt-20 lg:ml-64">
+      <main id="main-content" className="min-h-screen pt-20 lg:ml-64">
         <div className="p-4 md:p-8 flex flex-col gap-8">
           {isUsingMock && (
             <div className="flex items-center gap-2 rounded-xl border-3 border-amber-500 bg-amber-50 p-4 text-amber-900 shadow-[4px_4px_0px_0px_rgba(245,158,11,1)]">

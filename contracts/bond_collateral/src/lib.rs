@@ -6,7 +6,8 @@ use soroban_sdk::{
 };
 
 pub mod access_control;
-mod formal_properties;
+#[cfg(kani)]
+pub mod formal_properties;
 
 #[contracttype]
 #[derive(Clone)]
@@ -200,6 +201,20 @@ fn compute_seize_amount(collateral: i128, bond: i128, price: i128, target_ratio:
         return collateral;
     }
     numerator / denominator
+}
+
+fn calculate_bond_reduction(
+    seize_amount: i128,
+    effective_price: i128,
+    bond: i128,
+) -> Result<i128, ContractError> {
+    let value = seize_amount
+        .checked_mul(effective_price)
+        .ok_or(ContractError::InvalidAmount)?;
+    let reduction = value
+        .checked_div(PRICE_SCALE)
+        .ok_or(ContractError::InvalidAmount)?;
+    Ok(reduction.min(bond))
 }
 
 /// Fetch oracle price from the configured feed contract.  Returns None when no

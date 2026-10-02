@@ -192,6 +192,7 @@ import {
 import { createPartnerLandlordApplicationsRouter } from "./routes/partnerLandlordApplications.js";
 import { createApartmentReviewsRouter } from "./routes/apartmentReviews.js";
 import { createComplianceReportRouter } from "./routes/complianceReport.js";
+import { flushQueuedMessageNotificationDigest, sendQueuedMessageNotificationEmail, type PendingMessageDigest } from "./services/messageNotificationService.js";
 import { createWhistleblowerReportsRouter } from "./routes/whistleblowerReports.js";
 import { createTenantDataExportRouter } from "./routes/tenantDataExport.js";
 import { createTenantErasureRouter } from "./routes/tenantErasure.js";
@@ -234,16 +235,16 @@ import { createCircuitBreakerRouter } from "./routes/circuitBreaker.js";
 import { initFraudStore, PostgresFraudStore } from "./fraud/index.js";
 import { createAdminFraudRouter } from "./routes/adminFraud.js";
 import { createAdminOutboxRouter } from "./routes/adminOutbox.js";
-import { initializeCacheInvalidationWebhooks } from "./services/cacheInvalidation.js";
+import {
+  cacheInvalidationService,
+  initializeCacheInvalidationWebhooks,
+} from "./services/cacheInvalidation.js";
 import { createKycWebhookRouter } from "./routes/kyc.js";
 import { createOnboardingRouter } from "./routes/onboarding.js";
 import { createEmployersRouter } from "./routes/employers.js";
 import { createMessagingRouter } from "./routes/messaging.js";
-import {
-  flushQueuedMessageNotificationDigest,
-  sendQueuedMessageNotificationEmail,
-} from "./services/messageNotificationService.js";
 import { createAttachmentsRouter } from "./routes/attachments.js";
+import { getStorageProvider } from "./services/storageService.js";
 import { MonthlyDeductionReminderJob } from "./jobs/monthlyDeductionReminderJob.js";
 import {
   dataRetentionPurgeJobHandler,
@@ -521,20 +522,16 @@ export function createApp() {
   }
 
   // Register notification job handler
-  const notificationService = getNotificationService();
-  jobScheduler.registerHandler("notification.send", async (job) => {
-    await notificationService.send(job.payload as any);
-  });
-  jobScheduler.registerHandler("messaging.notification.digest", async (job) => {
-    await flushQueuedMessageNotificationDigest(
-      (job.payload as { key: string }).key,
-    );
-  });
-  jobScheduler.registerHandler("messaging.notification.email", async (job) => {
-    await sendQueuedMessageNotificationEmail(
-      (job.payload as { key: string }).key,
-    );
-  });
+  const notificationService = getNotificationService()
+  jobScheduler.registerHandler('notification.send', async (job) => {
+    await notificationService.send(job.payload as any)
+  })
+  jobScheduler.registerHandler('messaging.notification.digest', async (job) => {
+    await flushQueuedMessageNotificationDigest(job.payload as { key: string; digest?: PendingMessageDigest })
+  })
+  jobScheduler.registerHandler('messaging.notification.email', async (job) => {
+    await sendQueuedMessageNotificationEmail(job.payload as { key: string; digest?: PendingMessageDigest })
+  })
 
   // Register webhook delivery job handler
   jobScheduler.registerHandler("webhook.delivery", async (job) => {
@@ -659,6 +656,9 @@ export function createApp() {
       const secretRotationService = getSecretRotationService();
       secretRotationService.stopWatching();
 
+      // Stop the cache invalidation flush interval
+      cacheInvalidationService.stop();
+
       // Stop all workers
       await Promise.all(workers.map((w) => w.stop()));
 
@@ -722,12 +722,6 @@ export function createApp() {
         }
       },
     }),
-  );
-
-  // Core administrative routes
-  app.use(
-    "/api/admin/timelock",
-    adminTimelockRouter(sorobanAdapter as any, timelockRepo),
   );
 
   app.use(
@@ -823,6 +817,10 @@ export function createApp() {
   app.use("/api/v1/admin/jobs", createAdminJobsRouter());
   app.use("/api/v1/admin/quota", createAdminQuotaRouter());
   app.use("/api/v1/admin/webhook-replay", createWebhookReplayRouter());
+  app.use(
+    "/api/v1/admin/timelock",
+    adminTimelockRouter(sorobanAdapter as any, timelockRepo),
+  );
   app.use("/api/v1/deals", createDealsRouter());
   app.use("/api/v1/whistleblower", createWhistleblowerRouter(earningsService));
   app.use(
@@ -1217,7 +1215,7 @@ export function createApp() {
 
   // Interactive API documentation
   app.use("/api/v1/messaging", createMessagingRouter());
-  app.use("/api/v1/messaging/attachments", createAttachmentsRouter());
+  app.use("/api/v1/messaging/attachments", createAttachmentsRouter(getStorageProvider()));
   app.use("/docs", createDocsRouter());
 
   // Backward compatibility redirect from /api/* to /api/v1/*

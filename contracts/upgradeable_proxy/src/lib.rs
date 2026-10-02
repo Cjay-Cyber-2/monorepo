@@ -20,11 +20,11 @@
 //! - Only the stored `Admin` may propose an upgrade.
 //! - Only the stored `SecondApprover` may confirm it.
 //! - The confirmed hash must match the proposed hash (prevents TOCTOU).
-//! - Admin can be transferred via the same two-step flow.
+//! - Admin can be transferred via a two-step flow (propose + confirm).
 
 use soroban_sdk::Address;
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, BytesN, Env, Map, String, Symbol,
+    contract, contracterror, contractimpl, contracttype, Address, BytesN, Env, Map, String, Symbol,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,6 +42,8 @@ pub enum DataKey {
     SecondApprover,
     /// Pending upgrade WASM hash proposed by admin (None if no proposal open).
     PendingUpgrade,
+    /// Pending admin transfer proposed by current admin (None if no proposal open).
+    PendingAdminTransfer,
     /// Arbitrary key/value store used to demonstrate state preservation.
     Store,
 }
@@ -61,6 +63,10 @@ pub enum ProxyError {
     NoPendingUpgrade = 4,
     /// The hash passed to `confirm_upgrade` does not match the proposal.
     HashMismatch = 5,
+    /// `confirm_transfer_admin` called but no proposal is open.
+    NoPendingAdminTransfer = 6,
+    /// The address passed to `confirm_transfer_admin` does not match the proposal.
+    AdminTransferMismatch = 7,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -240,24 +246,81 @@ impl UpgradeableProxy {
 
     // ── Admin transfer (two-step) ─────────────────────────────────────────────
 
-    /// Transfer admin rights. Requires current admin auth; new admin takes
-    /// effect immediately (single-step for simplicity — extend to two-step
-    /// if desired).
-    pub fn transfer_admin(env: Env, admin: Address, new_admin: Address) -> Result<(), ProxyError> {
+    /// Propose a transfer of admin rights to a new address.
+    /// Only the current admin may propose.
+    pub fn propose_transfer_admin(env: Env, admin: Address, new_admin: Address) -> Result<(), ProxyError> {
         admin.require_auth();
 
         if admin != get_admin(&env) {
             return Err(ProxyError::NotAdmin);
         }
 
+        if new_admin == admin {
+            return Err(ProxyError::AdminTransferMismatch);
+        }
+
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingAdminTransfer, &new_admin);
+
+        env.events().publish(
+            (
+                Symbol::new(&env, "upgradeable_proxy"),
+                Symbol::new(&env, "admin_transfer_proposed"),
+            ),
+            (admin, new_admin),
+        );
+
+        Ok(())
+    }
+
+    /// Confirm a proposed admin transfer.
+    /// Only the new admin (the proposed recipient) may confirm.
+    pub fn confirm_transfer_admin(env: Env, new_admin: Address) -> Result<(), ProxyError> {
+        new_admin.require_auth();
+
+        let pending = env
+            .storage()
+            .instance()
+            .get::<_, Address>(&DataKey::PendingAdminTransfer)
+            .ok_or(ProxyError::NoPendingAdminTransfer)?;
+
+        if pending != new_admin {
+            return Err(ProxyError::AdminTransferMismatch);
+        }
+
+        let old_admin = get_admin(&env);
+
         env.storage().instance().set(&DataKey::Admin, &new_admin);
+        env.storage().instance().remove(&DataKey::PendingAdminTransfer);
 
         env.events().publish(
             (
                 Symbol::new(&env, "upgradeable_proxy"),
                 Symbol::new(&env, "admin_transferred"),
             ),
-            (admin, new_admin),
+            (old_admin, new_admin),
+        );
+
+        Ok(())
+    }
+
+    /// Cancel a pending admin transfer proposal. Only the current admin can cancel.
+    pub fn cancel_transfer_admin(env: Env, admin: Address) -> Result<(), ProxyError> {
+        admin.require_auth();
+
+        if admin != get_admin(&env) {
+            return Err(ProxyError::NotAdmin);
+        }
+
+        env.storage().instance().remove(&DataKey::PendingAdminTransfer);
+
+        env.events().publish(
+            (
+                Symbol::new(&env, "upgradeable_proxy"),
+                Symbol::new(&env, "admin_transfer_cancelled"),
+            ),
+            admin,
         );
 
         Ok(())
@@ -298,6 +361,10 @@ impl UpgradeableProxy {
 
     pub fn has_pending_upgrade(env: Env) -> bool {
         env.storage().instance().has(&DataKey::PendingUpgrade)
+    }
+
+    pub fn has_pending_admin_transfer(env: Env) -> bool {
+        env.storage().instance().has(&DataKey::PendingAdminTransfer)
     }
 }
 
@@ -719,10 +786,117 @@ mod test {
         assert_eq!(contract_name, Symbol::new(&env, "upgradeable_proxy"));
     }
 
-    // ── transfer_admin ────────────────────────────────────────────────────────
+    // ── two-step admin transfer ───────────────────────────────────────────────
 
     #[test]
-    fn admin_can_transfer_admin_rights() {
+    fn two_step_admin_transfer() {
+        let env = Env::default();
+        let (contract_id, client, admin, _approver) = setup(&env);
+        let new_admin = Address::generate(&env);
+
+        // Initial admin
+        assert_eq!(client.admin(), admin);
+
+        // 1. Propose transfer
+        env.mock_auths(&[MockAuth {
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "propose_transfer_admin",
+                args: (admin.clone(), new_admin.clone()).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
+        client
+            .try_propose_transfer_admin(&admin, &new_admin)
+            .unwrap()
+            .unwrap();
+
+        // Should NOT have transferred yet
+        assert_eq!(client.admin(), admin);
+        assert!(client.has_pending_admin_transfer());
+
+        // 2. Confirm transfer
+        env.mock_auths(&[MockAuth {
+            address: &new_admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "confirm_transfer_admin",
+                args: (new_admin.clone(),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
+        client
+            .try_confirm_transfer_admin(&new_admin)
+            .unwrap()
+            .unwrap();
+
+        // Should NOW have transferred
+        assert_eq!(client.admin(), new_admin);
+        assert!(!client.has_pending_admin_transfer());
+    }
+
+    #[test]
+    fn confirm_transfer_admin_fails_with_no_pending_proposal() {
+        let env = Env::default();
+        let (contract_id, client, _admin, _approver) = setup(&env);
+        let new_admin = Address::generate(&env);
+
+        env.mock_auths(&[MockAuth {
+            address: &new_admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "confirm_transfer_admin",
+                args: (new_admin.clone(),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
+        let err = client
+            .try_confirm_transfer_admin(&new_admin)
+            .unwrap_err()
+            .unwrap();
+        assert_eq!(err, ProxyError::NoPendingAdminTransfer);
+    }
+
+    #[test]
+    fn confirm_transfer_admin_fails_when_address_mismatches_proposal() {
+        let env = Env::default();
+        let (contract_id, client, admin, _approver) = setup(&env);
+        let proposed_admin = Address::generate(&env);
+        let wrong_admin = Address::generate(&env);
+
+        env.mock_auths(&[MockAuth {
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "propose_transfer_admin",
+                args: (admin.clone(), proposed_admin.clone()).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
+        client
+            .try_propose_transfer_admin(&admin, &proposed_admin)
+            .unwrap()
+            .unwrap();
+
+        env.mock_auths(&[MockAuth {
+            address: &wrong_admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "confirm_transfer_admin",
+                args: (wrong_admin.clone(),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
+        let err = client
+            .try_confirm_transfer_admin(&wrong_admin)
+            .unwrap_err()
+            .unwrap();
+        assert_eq!(err, ProxyError::AdminTransferMismatch);
+    }
+
+    #[test]
+    fn admin_can_cancel_pending_transfer() {
         let env = Env::default();
         let (contract_id, client, admin, _approver) = setup(&env);
         let new_admin = Address::generate(&env);
@@ -731,38 +905,51 @@ mod test {
             address: &admin,
             invoke: &MockAuthInvoke {
                 contract: &contract_id,
-                fn_name: "transfer_admin",
+                fn_name: "propose_transfer_admin",
                 args: (admin.clone(), new_admin.clone()).into_val(&env),
                 sub_invokes: &[],
             },
         }]);
         client
-            .try_transfer_admin(&admin, &new_admin)
+            .try_propose_transfer_admin(&admin, &new_admin)
             .unwrap()
             .unwrap();
-        assert_eq!(client.admin(), new_admin);
+        assert!(client.has_pending_admin_transfer());
+
+        env.mock_auths(&[MockAuth {
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "cancel_transfer_admin",
+                args: (admin.clone(),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
+        client
+            .try_cancel_transfer_admin(&admin)
+            .unwrap()
+            .unwrap();
+        assert!(!client.has_pending_admin_transfer());
     }
 
     #[test]
-    fn non_admin_cannot_transfer_admin() {
+    fn propose_transfer_admin_fails_for_same_address() {
         let env = Env::default();
-        let (contract_id, client, _admin, _approver) = setup(&env);
-        let stranger = Address::generate(&env);
-        let new_admin = Address::generate(&env);
+        let (contract_id, client, admin, _approver) = setup(&env);
 
         env.mock_auths(&[MockAuth {
-            address: &stranger,
+            address: &admin,
             invoke: &MockAuthInvoke {
                 contract: &contract_id,
-                fn_name: "transfer_admin",
-                args: (stranger.clone(), new_admin.clone()).into_val(&env),
+                fn_name: "propose_transfer_admin",
+                args: (admin.clone(), admin.clone()).into_val(&env),
                 sub_invokes: &[],
             },
         }]);
         let err = client
-            .try_transfer_admin(&stranger, &new_admin)
+            .try_propose_transfer_admin(&admin, &admin)
             .unwrap_err()
             .unwrap();
-        assert_eq!(err, ProxyError::NotAdmin);
+        assert_eq!(err, ProxyError::AdminTransferMismatch);
     }
 }
